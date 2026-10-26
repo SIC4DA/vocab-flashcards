@@ -1,36 +1,146 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vocab Flashcards
 
-## Getting Started
+A personal, Quizlet-style vocabulary app. Make decks of words (term, meaning, picture), then learn them with flashcards, multiple choice, listening, writing, speaking, a Match game and generated tests. An adaptive **Learn** mode moves every word from recognising it to producing it, and **spaced repetition** brings it back right before you'd forget it.
 
-First, run the development server:
+Pictures and pronunciation are automatic and need no API keys. AI extras are optional: **each user adds their own free Gemini API key** in Settings, so nobody shares a quota.
+
+**👉 Step-by-step deployment guide: [DEPLOY.md](DEPLOY.md)**
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FYOUR_GITHUB_USER%2Fvocab-flashcards&project-name=vocab-flashcards&repository-name=vocab-flashcards&env=SESSION_SECRET&envDescription=At%20least%2032%20random%20characters%20used%20to%20sign%20login%20sessions.%20Generate%20one%20with%3A%20openssl%20rand%20-base64%2032&envLink=https%3A%2F%2Fgithub.com%2FYOUR_GITHUB_USER%2Fvocab-flashcards%23environment-variables&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22neon%22%2C%22productSlug%22%3A%22neon%22%2C%22protocol%22%3A%22storage%22%7D%5D)
+
+> **Before using the button:** push this project to your own GitHub repository and replace `YOUR_GITHUB_USER` in the button link above (twice) with your GitHub username.
+
+---
+
+## Features
+
+- **Accounts** — username + password (no email). Sessions are signed HTTP-only cookies. Brute-force lockout after 10 failed logins in 15 minutes.
+- **Decks & cards** — ~30 languages (with flags and right-to-left support), drag-and-drop or ↑/↓ reordering, undo on delete, Tab-to-add-row, bulk import (tab, comma or ` - `) with live preview, CSV export, duplicate/delete deck.
+- **Automatic images** — found on Openverse (Wikimedia Commons as fallback) when you save; pick another, upload your own (resized to 512 px WebP in the browser), paste a URL or remove it. Licence attribution is shown on the card.
+- **Pronunciation** — your browser's text-to-speech in the right language, with slow replay; optional Gemini cloud voice.
+- **Study modes** — Flashcards (3D flip, swipe), **Learn** (adaptive ladder), Write, Listen (dictation), Speak (speech recognition), Match (timed, best time saved), Test (generated exam with pass mark), and **Review all due** across decks.
+- **Smart answer checking** — ignores case/spacing/trailing punctuation, accepts `car / automobile` alternatives, “watch the accents”, typo tolerance with an “I was right” override, optional article-ignoring, on-screen special-character bar.
+- **Spaced repetition** — simplified SM-2. Progress is saved after every single answer.
+- **Stats** — stage bar (New / Learning / Mastered), due today, accuracy by mode, per-card table with reset, daily streak.
+- **In-app guide** — a "📖 Guide" page explains the learning ladder (when a word counts as learned), every mode, answer checking, reviews, settings and AI setup.
+- **Polish** — light/dark theme, keyboard shortcuts (`?` shows them), sound effects, skeletons, toasts, accessible markup, works on a 360 px phone.
+
+### The learning ladder
+
+| Stage | Name | Question |
+|---|---|---|
+| 0 | New | Flashcard (view front + back) |
+| 1 | Seen | Multiple choice: term → definition |
+| 2 | Recognized | Listening multiple choice, then reverse multiple choice |
+| 3 | Heard | Listen & write (dictation) |
+| 4 | Written | Write the term from the definition + picture |
+| 5 | Spoken | Say the term (skipped when speech isn't available) |
+| 6 | Mastered | Spaced-repetition reviews (Write 40%, Speak 30%, Dictation 20%, MC 10%) |
+
+Two correct answers in a row move a card up (configurable 1–3); a mistake moves it down one stage and it comes back 3–5 questions later.
+
+## Screenshots
+
+Screenshots of every page and study mode at 390 px and 1280 px are in [`docs/screenshots/`](docs/screenshots/) (e.g. `05-deck-1280.png`, `10-learn-multiple-choice-390.png`, `22-flashcards-dark-390.png`).
+
+## Deploy to Vercel (free Hobby plan)
+
+The full beginner-friendly walkthrough (GitHub → Vercel → database → first login) is in **[DEPLOY.md](DEPLOY.md)**. Short version:
+
+1. Push this repository to GitHub and fix the `YOUR_GITHUB_USER` placeholders in the button link above.
+2. Click **Deploy with Vercel**. Vercel will:
+   - clone the repo into your account,
+   - create a free **Neon Postgres** database through the Marketplace integration (this sets `DATABASE_URL`),
+   - ask you for **`SESSION_SECRET`** — paste the output of `openssl rand -base64 32` (or any 32+ random characters).
+3. The build runs the database migrations automatically, then the app is live. Open `https://<your-app>.vercel.app/api/health` — it should return `{"ok":true,"db":true}`.
+4. Sign up, then (optionally) lock the app — see [Disable sign-ups](#disable-sign-ups).
+
+**If the Neon database wasn't created by the button** (fallback, 3 steps):
+
+1. Vercel dashboard → your project → **Storage** → **Create Database** → **Neon** → create it.
+2. **Connect** it to the project (all environments) — this adds `DATABASE_URL`.
+3. **Deployments** → latest deployment → **Redeploy**.
+
+## Environment variables
+
+| Variable | Required | What it does |
+|---|---|---|
+| `DATABASE_URL` | Yes in production (set by the Neon integration) | Postgres connection string. Leave it empty locally to use the built-in embedded database. |
+| `SESSION_SECRET` | **Yes** | ≥ 32 random characters used to sign session tokens and encrypt users' saved Gemini keys. The app refuses to start without it. Generate: `openssl rand -base64 32`. Changing it logs everyone out and users must re-enter their Gemini key. |
+| `GEMINI_MODEL` | No | Text model. Default `gemini-3.6-flash`. |
+| `GEMINI_TTS_MODEL` | No | Text-to-speech model. Default `gemini-3.8-flash-lite-tts`. |
+| `ALLOW_SIGNUPS` | No | Default `true`. Set to `false` to close registration. |
+
+See [`.env.example`](.env.example).
+
+### AI features: every user brings their own Gemini key
+
+There is **no app-wide AI key**. Each user can add their own free key in **Settings → ✨ AI features**:
+
+1. Open [Google AI Studio → API keys](https://aistudio.google.com/apikey) and sign in with Google.
+2. Click **Create API key** and copy it (starts with `AIza`).
+3. In the app: **Settings → AI features** → paste → **Save key**. The app checks it with Google and shows "Connected".
+
+With a key, that user gets: better definition suggestions (plus an example sentence), smarter image keywords for non-English definitions, a cloud voice when their device has no voice for a language (or if they prefer it), speech transcription in browsers without speech recognition (e.g. Firefox), and **✨ Generate deck** from a topic. Usage counts only against their own free quota.
+
+Keys are verified with Google before saving, stored **encrypted** (AES-256-GCM, key derived from `SESSION_SECRET`), used only server-side for that user's own requests, never sent back to the browser and never logged. Calls are rate-limited to 60/minute per user, and any Gemini failure falls back to the free path.
+
+### Disable sign-ups
+
+After creating your own account: Vercel → **Settings** → **Environment Variables** → add `ALLOW_SIGNUPS` = `false` → **Redeploy**. The register page then shows “Sign-ups are closed”.
+
+### Forgotten passwords
+
+There is no email and no password-reset flow by design. A forgotten password can only be recovered by the owner editing the database (e.g. in the Neon console: replace the user's `password_hash` with a new bcrypt hash, or delete the user row).
+
+## Local development
+
+Requirements: Node.js 20.9+.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+```bash
+SESSION_SECRET="$(openssl rand -base64 32)" npm run dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Open http://localhost:3000. With no `DATABASE_URL` the app uses **PGlite** (embedded Postgres) stored in `./.pglite/` and migrates it automatically — no setup needed. You can also put `SESSION_SECRET=...` in a `.env.local` file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+To use a Neon database locally, set `DATABASE_URL` and run `npm run db:migrate`.
 
-## Learn More
+### Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Command | What it does |
+|---|---|
+| `npm run dev` | Development server (PGlite if `DATABASE_URL` is empty) |
+| `npm run build` | Runs DB migrations (when `DATABASE_URL` is set), then `next build` |
+| `npm start` | Production server |
+| `npm run lint` | ESLint (zero warnings allowed) |
+| `npm run typecheck` | Route type generation + `tsc` |
+| `npm test` | Vitest unit + integration tests (in-memory PGlite, no network) |
+| `npm run test:e2e` | Production build + Playwright (Chromium, desktop and mobile viewports, all external APIs mocked) |
+| `npm run db:generate` | Generate a new migration after editing `lib/db/schema.ts` |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Full check: `npm run lint && npm run typecheck && npm test && npm run test:e2e && npm run build`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Browser support
 
-## Deploy on Vercel
+| Browser | Pronunciation (speech synthesis) | Speaking (speech recognition) |
+|---|---|---|
+| Chrome (desktop & Android) | ✅ | ✅ (uses Google's online service) |
+| Edge | ✅ | ✅ |
+| Safari (macOS & iOS 14.5+) | ✅ | ✅ |
+| Firefox | ✅ | ❌ — Speak mode is disabled with an explanation; users who added a Gemini key get their recordings transcribed by Gemini instead |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Available voices depend on your operating system. If there is no voice for a language you'll see a one-time notice; install one in your OS speech settings or add your Gemini key in Settings for cloud audio. Browsers only play speech after you've interacted with the page, so the very first auto-play on a freshly opened tab may be skipped — press 🔊 or `P`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Keyboard shortcuts
+
+`Space` flip / play · `P` play audio · `Enter` submit / continue · `←` / `→` still learning / know it · `1`–`4` choose an option · `M` microphone · `Esc` exit session · `?` list shortcuts
+
+## Tech
+
+Next.js 16 (App Router, TypeScript strict) · Tailwind CSS 4 · Drizzle ORM + Neon serverless Postgres (PGlite locally and in tests) · custom auth with bcryptjs + jose · Zod · Vitest · Playwright. External services (all free, no key): Openverse, Wikimedia Commons, MyMemory.
+
+Project notes: [`DECISIONS.md`](DECISIONS.md) lists every assumption made while building; [`VALIDATION.md`](VALIDATION.md) records the acceptance checks.
