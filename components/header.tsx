@@ -18,8 +18,8 @@ export function Header() {
     try {
       await api("/api/auth/logout", { method: "POST" });
     } finally {
-      router.push("/login");
-      router.refresh();
+      // The /login render carries the fresh (logged-out) layout, so no extra refresh is needed.
+      router.replace("/login");
     }
   }
 

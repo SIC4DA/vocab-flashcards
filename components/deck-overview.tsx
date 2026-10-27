@@ -43,13 +43,15 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
   const router = useRouter();
   const toast = useToast();
   const confirm = useConfirm();
-  const { speakAvailable, speechSupported, speechFallback, settings } = useApp();
+  const { speakAvailable, speechSupported, speechFallback, settings, gemini } = useApp();
+  const [organizing, setOrganizing] = useState<string | null>(null);
   const [cards, setCards] = useState(initialCards);
   const [busy, setBusy] = useState(false);
   const termLang = getLanguage(deck.termLang);
   const defLang = getLanguage(deck.definitionLang);
 
   const buckets = useMemo(() => stageBuckets(cards), [cards]);
+  const hasTopics = cards.some((c) => c.groupLabel);
   const dueCount = useMemo(() => cards.filter((c) => c.progress.stage >= 1 && isDue(c.progress.dueAt)).length, [cards]);
   const accuracy = useMemo(() => {
     const agg: Record<string, { correct: number; wrong: number }> = {};
@@ -87,6 +89,32 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
     } catch (err) {
       toast.show(err instanceof ApiClientError ? err.message : "Couldn't delete", { kind: "error" });
       setBusy(false);
+    }
+  }
+
+  /** AI pass over every card: picture yes/no, image keyword and topic; then find missing pictures. */
+  async function organize() {
+    setOrganizing("Organising with AI…");
+    try {
+      const ids = cards.map((c) => c.id);
+      for (let i = 0; i < ids.length; i += 60) {
+        setOrganizing(`Organising with AI… ${Math.min(i + 60, ids.length)}/${ids.length}`);
+        await api(`/api/decks/${deck.id}/organize`, { body: { cardIds: ids.slice(i, i + 60), force: true } });
+      }
+      const fresh = await api<{ cards: CardDTO[] }>(`/api/decks/${deck.id}`);
+      const missing = fresh.cards.filter((c) => !c.displayImageUrl && !c.noImage);
+      let done = 0;
+      for (const c of missing) {
+        setOrganizing(`Finding images… ${++done}/${missing.length}`);
+        await api(`/api/cards/${c.id}/auto-image`, { method: "POST" }).catch(() => null);
+      }
+      const final = await api<{ cards: CardDTO[] }>(`/api/decks/${deck.id}`);
+      setCards(final.cards);
+      toast.show("Deck organised: topics set, pictures only where they help", { kind: "success" });
+    } catch (err) {
+      toast.show(err instanceof ApiClientError ? err.message : "Organising failed", { kind: "error" });
+    } finally {
+      setOrganizing(null);
     }
   }
 
@@ -131,6 +159,18 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
             <Link href={`/decks/${deck.id}/edit`} className="btn-primary">
               Edit
             </Link>
+            {gemini && cards.length > 0 && (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={organize}
+                disabled={Boolean(organizing)}
+                title="Group words by topic and keep pictures only for words where a picture helps"
+                data-testid="organize-ai"
+              >
+                {organizing ?? "✨ Organize with AI"}
+              </button>
+            )}
             <button type="button" className="btn-secondary" onClick={duplicate} disabled={busy}>
               Duplicate
             </button>
@@ -264,6 +304,9 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
                     </th>
                     <th className="px-4 py-2" scope="col">Term</th>
                     <th className="px-4 py-2" scope="col">Definition</th>
+                    {hasTopics && (
+                      <th className="px-4 py-2" scope="col">Topic</th>
+                    )}
                     <th className="px-4 py-2" scope="col">Stage</th>
                     <th className="px-4 py-2" scope="col">Next due</th>
                     <th className="px-4 py-2" scope="col">✓ / ✗</th>
@@ -281,7 +324,13 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
                     return (
                       <tr key={c.id} className="border-t border-line" data-testid="card-table-row">
                         <td className="w-14 px-4 py-2">
-                          <CardImage src={c.displayImageUrl} alt={c.definition} term={c.term} className="h-10 w-10" />
+                          {c.displayImageUrl || !c.noImage ? (
+                            <CardImage src={c.displayImageUrl} alt={c.definition} term={c.term} className="h-10 w-10" />
+                          ) : (
+                            <span className="text-xs text-muted" title="No picture needed">
+                              —
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-2 font-semibold" dir={langDir(deck.termLang)} lang={deck.termLang}>
                           <span className="inline-flex items-center gap-1">
@@ -292,6 +341,11 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
                         <td className="px-4 py-2" dir={langDir(deck.definitionLang)}>
                           {c.definition}
                         </td>
+                        {hasTopics && (
+                          <td className="px-4 py-2 text-muted" data-testid="card-topic">
+                            {c.groupLabel ?? "—"}
+                          </td>
+                        )}
                         <td className="px-4 py-2" data-testid="card-stage">
                           {STAGE_NAMES[c.progress.stage]}
                         </td>

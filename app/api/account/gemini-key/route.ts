@@ -16,12 +16,11 @@ export const PUT = route(async (req) => {
   const { apiKey } = await parseJson(req, geminiKeySchema);
   await rateLimit(`gemini-key:${user.id}`, 10, 10 * 60_000);
   const check = await verifyGeminiKey(apiKey);
-  if (check === "invalid") {
-    throw new ApiError(400, "invalid_key", "Google rejected this key. Copy it again from Google AI Studio.", {
-      apiKey: "Google rejected this key. Copy it again from Google AI Studio.",
-    });
+  if (check.status === "invalid") {
+    const msg = `Google rejected this key${check.message ? `: “${check.message}”` : "."} Copy it again from Google AI Studio.`;
+    throw new ApiError(400, "invalid_key", msg, { apiKey: msg });
   }
-  if (check === "unreachable") {
+  if (check.status === "unreachable") {
     throw new ApiError(502, "unreachable", "Couldn't reach Google to check the key. Please try again.");
   }
   const db = await getDb();

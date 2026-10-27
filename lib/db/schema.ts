@@ -89,6 +89,14 @@ export const cards = pgTable(
     imageData: bytea("image_data"),
     imageMime: text("image_mime"),
     imageAttribution: text("image_attribution"),
+    /** Where the image came from: auto | picked | url | upload (null = legacy, treated as auto). */
+    imageSource: text("image_source"),
+    /** True when this word doesn't need a picture (decided by AI/heuristics, or the user removed it). */
+    noImage: boolean("no_image").notNull().default(false),
+    /** Better image-search keyword suggested by AI. */
+    imageQuery: text("image_query"),
+    /** Topic group suggested by AI (e.g. "Kitchen"), used to introduce related words together. */
+    groupLabel: text("group_label"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -142,6 +150,17 @@ export const reviewLog = pgTable(
 export const ttsCache = pgTable("tts_cache", {
   key: text("key").primaryKey(),
   audio: bytea("audio").notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** Cache of native-speaker recordings found on Wiktionary/Wikimedia Commons (url null = none found). */
+export const pronunciations = pgTable("pronunciations", {
+  key: text("key").primaryKey(),
+  url: text("url"),
+  attribution: text("attribution"),
+  /** Leading article that the recording doesn't include (e.g. "der" for "der Hund"). */
+  prefix: text("prefix"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

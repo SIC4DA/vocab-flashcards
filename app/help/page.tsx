@@ -155,7 +155,7 @@ export default async function HelpPage() {
       <H2 id="modes">Study modes</H2>
       <dl className="space-y-3">
         {[
-          ["🧠 Learn", "The main mode. Picks the right question for each word’s stage (see the ladder). Works in rounds of a few words; after each round you see which words moved up and which you missed. New words are limited per day."],
+          ["🧠 Learn", "The main mode. Picks the right question for each word’s stage (see the ladder). Works in rounds of a few words; after each round you see which words moved up and which you missed. New words are limited per day and are introduced in the order of your deck — or, with your Gemini key, topic by topic (e.g. all “Kitchen” words together)."],
           ["🃏 Flashcards", "Flip cards (tap, click or Space). Sort them with “Know it” (→) or “Still learning” (←), or swipe on a phone. At the end you can study only the still-learning ones again. Options: shuffle, definition first."],
           ["✍️ Write", "Every word as a writing question in random order. Wrong ones come back at the end."],
           ["🎧 Listen", "Dictation: you only hear the word (🔊 replay, 🐢 slow) and type it."],
@@ -242,9 +242,29 @@ export default async function HelpPage() {
       <H2 id="audio">Audio, speaking and your browser</H2>
       <ul className="list-disc space-y-2 pl-6">
         <li>
-          Pronunciation uses your device’s built-in voices. Press 🔊 or <kbd>P</kbd> any time; 🐢 plays slowly. If your device
-          has no voice for a language you’ll see a notice — install one in your system’s speech/language settings, or add a
-          Gemini key for a cloud voice.
+          <b>Where the sound comes from</b> (best first):
+          <ol className="mt-1 list-decimal space-y-1 pl-6">
+            <li>
+              <b>A real native speaker.</b> For single words and short expressions the app looks for a recording on Wiktionary /
+              Wikimedia Commons (free, no key). Most common words in German, Spanish, French, English and many other
+              languages have one. For nouns like <i>der Hund</i>, the article is read first and then the recording of <i>Hund</i>{" "}
+              plays.
+            </li>
+            <li>
+              <b>Gemini’s natural voice</b> — only with your own Gemini key, when you turn on “Prefer cloud voice” or your
+              device has no voice for the language. Gemini’s free voice quota is small, so each clip is generated once and
+              cached; when the quota runs out the device voice takes over automatically.
+            </li>
+            <li>
+              <b>Your device’s voice</b> for everything else (sentences, rare words). The app picks the best-sounding voice your
+              device has (for example “Google Deutsch” in Chrome, or an “Enhanced” voice on Apple devices). Installing a better
+              voice in your system’s language settings improves this too.
+            </li>
+          </ol>
+        </li>
+        <li>
+          Press 🔊 or <kbd>P</kbd> any time; 🐢 plays slowly. You can turn recordings off in Settings (“Use native-speaker
+          recordings”).
         </li>
         <li>
           Browsers only allow sound after you’ve clicked or tapped something on the page, so auto-play may stay silent on a
@@ -264,11 +284,24 @@ export default async function HelpPage() {
 
       <H2 id="images">Pictures</H2>
       <p>
-        When you save a card without a picture, the app searches openly licensed images (Openverse, then Wikimedia Commons)
-        using the meaning. In the editor, click the picture box to <b>choose another image</b>, <b>upload your own</b> (it’s
-        shrunk automatically), <b>paste an image link</b>, or <b>remove</b> it. The photographer and licence are shown under
-        the picture on the back of the card.
+        Pictures help with things you can see — objects, food, animals, colours, places — but not with words like
+        <i> to spell</i>, <i>to believe</i> or <i>although</i>. So the app only adds a picture where it helps:
       </p>
+      <ul className="list-disc space-y-2 pl-6">
+        <li>
+          <b>With your Gemini key</b>, when you save a deck, Gemini looks at each word and decides whether a picture helps,
+          picks a good search word for it, and sorts the words into topics. For decks you made earlier, press{" "}
+          <b>✨ Organize with AI</b> on the deck page — it also removes automatic pictures from words that don’t need one.
+        </li>
+        <li>
+          <b>Without a key</b>, words whose meaning is an English verb (“to …”) get no picture; everything else gets one.
+        </li>
+        <li>
+          Pictures are openly licensed (Openverse, then Wikimedia Commons). In the editor, click the picture box to{" "}
+          <b>choose another image</b>, <b>upload your own</b>, <b>paste an image link</b>, or <b>remove</b> it. Your own
+          choices are never changed by the AI. Words without a picture simply show no image while you study.
+        </li>
+      </ul>
 
       <H2 id="ai">AI features (your own Gemini key)</H2>
       <p>
@@ -284,7 +317,9 @@ export default async function HelpPage() {
           </a>{" "}
           and sign in with Google.
         </li>
-        <li>Click <b>Create API key</b> and copy it (it starts with “AIza”).</li>
+        <li>
+          Click <b>Create API key</b> and copy it. New keys start with <b>“AQ.”</b> (older keys start with “AIza” — both work).
+        </li>
         <li>
           In <b>Settings → AI features</b>, paste it and press <b>Save key</b>. The app checks it with Google and shows
           “Connected”.
@@ -293,7 +328,12 @@ export default async function HelpPage() {
       <p>With a key you get:</p>
       <ul className="list-disc space-y-1 pl-6">
         <li>Better <b>Auto-fill definition</b>, plus an example sentence.</li>
-        <li>Smarter picture search when your definitions aren’t in English.</li>
+        <li>
+          <b>Smart pictures</b>: only words that benefit get one, found with a better search word.
+        </li>
+        <li>
+          <b>Topics</b>: words are grouped by theme, and Learn introduces new words topic by topic.
+        </li>
         <li>A <b>cloud voice</b> when your device has no voice for a language (or always, with “Prefer cloud voice”).</li>
         <li>Speaking practice in browsers without speech recognition.</li>
         <li>
@@ -310,7 +350,8 @@ export default async function HelpPage() {
         {[
           ["Auto-play term / definition", "Speak the word (or the meaning) automatically when a card appears."],
           ["Speech rate", "How fast words are spoken (0.5–1.5×)."],
-          ["Prefer cloud voice", "Use Gemini’s voice instead of your device’s (only with your Gemini key)."],
+          ["Use native-speaker recordings", "Play real recordings from Wiktionary when they exist (recommended)."],
+          ["Prefer cloud voice", "For words without a recording, use Gemini’s voice instead of your device’s (only with your Gemini key)."],
           ["Sound effects", "Short tones for right and wrong answers."],
           ["Enable speaking questions", "Turn off if you can’t use a microphone; the Spoken stage is then skipped."],
           ["Strict accents", "Count answers with wrong or missing accents as wrong."],
@@ -346,6 +387,10 @@ export default async function HelpPage() {
           <b>Delete account</b> (Settings) permanently removes your account, decks, progress and saved Gemini key.
         </li>
         <li>You can export any deck as a CSV file from the deck page.</li>
+        <li>
+          Recordings are by Wiktionary / Wikimedia Commons contributors (Creative Commons licences); pictures come from
+          Openverse and Wikimedia Commons with the credit shown on each card.
+        </li>
       </ul>
 
       <p className="pt-4">

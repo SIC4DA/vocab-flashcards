@@ -15,6 +15,13 @@
       "when": 1793055650146,
       "tag": "0001_user_gemini_key",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793059050871,
+      "tag": "0002_smart_images_audio_groups",
+      "breakpoints": true
     }
   ]
 }

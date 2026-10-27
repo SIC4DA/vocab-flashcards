@@ -58,6 +58,8 @@ export type StudyCard = {
   example: string;
   imageUrl: string | null;
   imageAttribution: string | null;
+  /** Topic group suggested by AI (null without a Gemini key). */
+  group?: string | null;
   termLang: string;
   definitionLang: string;
   progress: Progress;
@@ -339,19 +341,34 @@ export function isCardDue(c: StudyCard, now: Date = new Date()) {
 }
 
 /**
- * Learn candidates in priority order: due cards first, then cards in progress,
- * then new cards (limited by `newAllowed`).
+ * Learn candidates in priority order: due cards first, then cards in progress, then new cards
+ * (limited by `newAllowed`). When cards have AI topic groups, new words are introduced topic by
+ * topic: the topic you're already learning continues first, then the next topic in deck order.
  */
 export function selectLearnCandidates(cards: StudyCard[], opts: { now: Date; newAllowed: number }): StudyCard[] {
   const due = cards
     .filter((c) => isCardDue(c, opts.now))
     .sort((a, b) => new Date(a.progress.dueAt!).getTime() - new Date(b.progress.dueAt!).getTime());
   const dueIds = new Set(due.map((c) => c.id));
-  const inProgress = cards
-    .filter((c) => !dueIds.has(c.id) && c.progress.stage >= 1 && c.progress.stage < MAX_STAGE)
-    .sort((a, b) => a.progress.stage - b.progress.stage);
-  const fresh = cards.filter((c) => c.progress.stage === 0).slice(0, Math.max(0, opts.newAllowed));
-  return [...due, ...inProgress, ...fresh];
+  const inProgress = cards.filter((c) => !dueIds.has(c.id) && c.progress.stage >= 1 && c.progress.stage < MAX_STAGE);
+  const freshAll = cards.filter((c) => c.progress.stage === 0);
+  const anchor = anchorGroup(inProgress, freshAll);
+  const inAnchor = (c: StudyCard) => (anchor !== null && c.group === anchor ? 0 : 1);
+  inProgress.sort((a, b) => a.progress.stage - b.progress.stage || inAnchor(a) - inAnchor(b));
+  const fresh = anchor === null ? freshAll : [...freshAll.filter((c) => c.group === anchor), ...freshAll.filter((c) => c.group !== anchor)];
+  return [...due, ...inProgress, ...fresh.slice(0, Math.max(0, opts.newAllowed))];
+}
+
+/** The topic to continue: the most common topic among words in progress that still has new words, else the first new word's topic. */
+export function anchorGroup(inProgress: StudyCard[], fresh: StudyCard[]): string | null {
+  const freshGroups = new Set(fresh.map((c) => c.group).filter((g): g is string => Boolean(g)));
+  if (freshGroups.size === 0) return null;
+  const counts = new Map<string, number>();
+  for (const c of inProgress) if (c.group && freshGroups.has(c.group)) counts.set(c.group, (counts.get(c.group) ?? 0) + 1);
+  let bestGroup: string | null = null;
+  let bestCount = 0;
+  for (const [g, n] of counts) if (n > bestCount) [bestGroup, bestCount] = [g, n];
+  return bestGroup ?? fresh.find((c) => c.group)?.group ?? null;
 }
 
 export function selectRound(

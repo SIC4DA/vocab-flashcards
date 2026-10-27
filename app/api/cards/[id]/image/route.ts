@@ -31,7 +31,7 @@ export const POST = route(async (req, ctx: Ctx) => {
   const db = await getDb();
   const [updated] = await db
     .update(schema.cards)
-    .set({ imageData: bytes, imageMime: mime, imageUrl: null, imageAttribution: null })
+    .set({ imageData: bytes, imageMime: mime, imageUrl: null, imageAttribution: null, imageSource: "upload", noImage: false })
     .where(eq(schema.cards.id, card.id))
     .returning({ updatedAt: schema.cards.updatedAt });
   return ok({ displayImageUrl: `/api/cards/${card.id}/image?v=${updated.updatedAt.getTime()}` });

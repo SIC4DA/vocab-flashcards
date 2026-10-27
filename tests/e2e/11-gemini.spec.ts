@@ -1,6 +1,6 @@
 import { expect, registerAPI, test, uid } from "./helpers";
 
-const VALID_KEY = "AIzaE2EValidGeminiKey_1234567890";
+const VALID_KEY = "AQ.Ab8RN6E2EValidGeminiKey_1234567890"; // new-style AI Studio key
 
 test("each user adds their own Gemini key in Settings; without it the AI UI is hidden", async ({ page, allowConsole }) => {
   allowConsole(/status of 400/); // the deliberately wrong key below
@@ -16,7 +16,7 @@ test("each user adds their own Gemini key in Settings; without it the AI UI is h
   await expect(page.getByText("Prefer cloud voice")).toHaveCount(0);
 
   // A key Google rejects shows an error
-  await page.getByLabel("Your Gemini API key").fill("AIzaThisKeyIsNotValid_0000000000");
+  await page.getByLabel("Your Gemini API key").fill("AQ.ThisKeyIsNotValid_0000000000.abc");
   await page.getByTestId("save-gemini-key").click();
   await expect(page.locator("#gemini-key-error")).toContainText("Google rejected this key");
 

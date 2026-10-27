@@ -78,6 +78,9 @@ export const cardInputSchema = z.object({
   imageAttribution: z.string().max(1000).nullable().optional(),
   /** Keep the uploaded image stored for this card (false removes it). */
   keepUploadedImage: z.boolean().optional(),
+  /** auto | picked | url | upload | none (the user removed the picture). */
+  imageSource: z.enum(["auto", "picked", "url", "upload", "none"]).nullable().optional(),
+  noImage: z.boolean().optional(),
 });
 
 export const cardsPutSchema = z.object({
@@ -155,9 +158,24 @@ export const geminiKeySchema = z.object({
     .string()
     .trim()
     .min(20, "That doesn't look like a Gemini API key")
-    .max(200, "That doesn't look like a Gemini API key")
-    .regex(/^[A-Za-z0-9_\-]+$/, "That doesn't look like a Gemini API key"),
+    .max(1000, "That doesn't look like a Gemini API key")
+    // Newer AI Studio keys ("auth keys", since May 2026) start with "AQ." and contain dots; older ones start with "AIza".
+    .regex(/^[A-Za-z0-9._\-]+$/, "That doesn't look like a Gemini API key — copy it again from Google AI Studio"),
 });
+
+export const organizeSchema = z.object({
+  cardIds: z.array(z.string().uuid()).max(80).optional(),
+  force: z.boolean().optional(),
+});
+
+export const organizedCardsSchema = z.array(
+  z.object({
+    i: z.number().int().min(0),
+    image: z.boolean(),
+    keyword: z.string().max(80).optional().default(""),
+    group: z.string().trim().min(1).max(40),
+  }),
+);
 
 export const matchResultSchema = z.object({ timeMs: z.number().int().min(1).max(3_600_000) });
 
@@ -168,6 +186,7 @@ export const settingsSchema = z.object({
   autoPlayDefinition: z.boolean().default(false),
   speechRate: z.number().min(0.5).max(1.5).default(0.9),
   preferCloudVoice: z.boolean().default(false),
+  useRecordings: z.boolean().default(true),
   enableSpeaking: z.boolean().default(true),
   strictAccents: z.boolean().default(false),
   ignoreArticles: z.boolean().default(false),

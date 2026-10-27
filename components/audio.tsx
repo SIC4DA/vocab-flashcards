@@ -11,11 +11,12 @@ export function useSpeak() {
     (text: string, lang: string, opts: { slow?: boolean; auto?: boolean } = {}) =>
       speak(text, lang, {
         auto: opts.auto,
+        recordings: settings.useRecordings,
         rate: opts.slow ? 0.6 : settings.speechRate,
         preferCloud: gemini && settings.preferCloudVoice,
         cloudAvailable: gemini,
       }),
-    [settings.speechRate, settings.preferCloudVoice, gemini],
+    [settings.speechRate, settings.preferCloudVoice, settings.useRecordings, gemini],
   );
 }
 

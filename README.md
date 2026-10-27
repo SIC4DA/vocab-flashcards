@@ -16,8 +16,9 @@ Pictures and pronunciation are automatic and need no API keys. AI extras are opt
 
 - **Accounts** — username + password (no email). Sessions are signed HTTP-only cookies. Brute-force lockout after 10 failed logins in 15 minutes.
 - **Decks & cards** — ~30 languages (with flags and right-to-left support), drag-and-drop or ↑/↓ reordering, undo on delete, Tab-to-add-row, bulk import (tab, comma or ` - `) with live preview, CSV export, duplicate/delete deck.
-- **Automatic images** — found on Openverse (Wikimedia Commons as fallback) when you save; pick another, upload your own (resized to 512 px WebP in the browser), paste a URL or remove it. Licence attribution is shown on the card.
-- **Pronunciation** — your browser's text-to-speech in the right language, with slow replay; optional Gemini cloud voice.
+- **Smart images** — pictures only where they help (objects, food, colours…, not "to spell"). Found on Openverse (Wikimedia Commons as fallback) when you save; with a Gemini key, AI decides per word and picks the search keyword. Pick another, upload your own (resized to 512 px WebP in the browser), paste a URL or remove it. Licence attribution is shown on the card.
+- **Topics** — with a Gemini key, words are grouped by theme and Learn introduces new words topic by topic.
+- **Pronunciation** — real native-speaker recordings from Wiktionary/Wikimedia Commons when available (free, no key), otherwise the best-sounding voice on the device; optional Gemini cloud voice with the user's own key. Slow replay.
 - **Study modes** — Flashcards (3D flip, swipe), **Learn** (adaptive ladder), Write, Listen (dictation), Speak (speech recognition), Match (timed, best time saved), Test (generated exam with pass mark), and **Review all due** across decks.
 - **Smart answer checking** — ignores case/spacing/trailing punctuation, accepts `car / automobile` alternatives, “watch the accents”, typo tolerance with an “I was right” override, optional article-ignoring, on-screen special-character bar.
 - **Spaced repetition** — simplified SM-2. Progress is saved after every single answer.
@@ -78,10 +79,10 @@ See [`.env.example`](.env.example).
 There is **no app-wide AI key**. Each user can add their own free key in **Settings → ✨ AI features**:
 
 1. Open [Google AI Studio → API keys](https://aistudio.google.com/apikey) and sign in with Google.
-2. Click **Create API key** and copy it (starts with `AIza`).
+2. Click **Create API key** and copy it. New keys start with `AQ.` (since May 2026); older `AIza…` keys also work.
 3. In the app: **Settings → AI features** → paste → **Save key**. The app checks it with Google and shows "Connected".
 
-With a key, that user gets: better definition suggestions (plus an example sentence), smarter image keywords for non-English definitions, a cloud voice when their device has no voice for a language (or if they prefer it), speech transcription in browsers without speech recognition (e.g. Firefox), and **✨ Generate deck** from a topic. Usage counts only against their own free quota.
+With a key, that user gets: better definition suggestions (plus an example sentence), smart pictures (only for words where a picture helps, with a better search keyword), topic groups that Learn uses to introduce related words together, a cloud voice when their device has no voice for a language (or if they prefer it), speech transcription in browsers without speech recognition (e.g. Firefox), and **✨ Generate deck** from a topic. Usage counts only against their own free quota.
 
 Keys are verified with Google before saving, stored **encrypted** (AES-256-GCM, key derived from `SESSION_SECRET`), used only server-side for that user's own requests, never sent back to the browser and never logged. Calls are rate-limited to 60/minute per user, and any Gemini failure falls back to the free path.
 
@@ -133,7 +134,7 @@ Full check: `npm run lint && npm run typecheck && npm test && npm run test:e2e &
 | Safari (macOS & iOS 14.5+) | ✅ | ✅ |
 | Firefox | ✅ | ❌ — Speak mode is disabled with an explanation; users who added a Gemini key get their recordings transcribed by Gemini instead |
 
-Available voices depend on your operating system. If there is no voice for a language you'll see a one-time notice; install one in your OS speech settings or add your Gemini key in Settings for cloud audio. Browsers only play speech after you've interacted with the page, so the very first auto-play on a freshly opened tab may be skipped — press 🔊 or `P`.
+Native-speaker recordings (Wiktionary) play in every browser. For words without a recording, available voices depend on your operating system. If there is no voice for a language you'll see a one-time notice; install one in your OS speech settings or add your Gemini key in Settings for cloud audio. Browsers only play speech after you've interacted with the page, so the very first auto-play on a freshly opened tab may be skipped — press 🔊 or `P`.
 
 ## Keyboard shortcuts
 

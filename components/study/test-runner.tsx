@@ -394,7 +394,7 @@ function TestQuestion({
       {(q.type === "write" || (q.type === "speak" && speakBroken)) && (
         <>
           <div className="mt-2 flex items-center gap-3">
-            <CardImage src={card.imageUrl} alt={card.definition} term={card.term} className="h-16 w-16" />
+            <CardImage src={card.imageUrl} alt={card.definition} term={card.term} className="h-16 w-16" hideIfMissing />
             <p className="text-lg font-bold" dir={langDir(card.definitionLang)}>
               {card.definition}
             </p>
@@ -413,7 +413,7 @@ function TestQuestion({
       )}
       {q.type === "speak" && !speakBroken && (
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <CardImage src={card.imageUrl} alt={card.definition} term={card.term} className="h-16 w-16" />
+          <CardImage src={card.imageUrl} alt={card.definition} term={card.term} className="h-16 w-16" hideIfMissing />
           <p className="text-lg font-bold">{card.definition}</p>
           <button
             type="button"

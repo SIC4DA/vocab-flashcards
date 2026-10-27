@@ -102,6 +102,33 @@ export async function geminiGenerateDeck(
   );
 }
 
+/**
+ * One request for a batch of cards: does each word need a picture, a good image-search keyword,
+ * and a topic group (reusing existing topic names).
+ */
+export async function geminiOrganize(
+  key: string,
+  items: { term: string; definition: string }[],
+  termLang: string,
+  existingGroups: string[],
+): Promise<unknown> {
+  const list = items.map((c, i) => ({ i, term: c.term, meaning: c.definition }));
+  return generateJson<unknown>(
+    key,
+    `You organise vocabulary flashcards for a learner of ${languageName(termLang)}.\n` +
+      `For EACH card return an object {"i": number, "image": boolean, "keyword": string, "group": string}.\n` +
+      `- "image": true only if a photo clearly shows the meaning and helps remember it: concrete objects, food, animals, ` +
+      `plants, places, buildings, vehicles, clothing, body parts, colours, weather, people/jobs, and clearly visible ` +
+      `physical actions (swim, eat, run). false for abstract nouns, most verbs (e.g. spell, think, believe, decide, ` +
+      `need), adjectives that can't be photographed, adverbs, pronouns, prepositions, conjunctions, numbers and phrases.\n` +
+      `- "keyword": 1-3 English words to search a stock photo (empty string when image is false).\n` +
+      `- "group": a short English topic label of 1-3 words, by theme or situation (e.g. "Kitchen", "Food", "Travel", ` +
+      `"Feelings", "Everyday verbs"), aiming for 3-10 cards per topic. Do not group by grammar alone unless nothing else fits. ` +
+      (existingGroups.length ? `Reuse these existing topics when they fit: ${JSON.stringify(existingGroups.slice(0, 40))}.\n` : "\n") +
+      `Reply with a JSON array only, one object per card, same "i" values.\n\nCards: ${JSON.stringify(list)}`,
+  );
+}
+
 export async function geminiTranscribe(key: string, audio: Buffer, mimeType: string, lang: string): Promise<string> {
   const res = await call(key, geminiModel(), {
     contents: [
@@ -158,19 +185,33 @@ export function pcmToWav(pcm: Buffer, sampleRate = 24000, channels = 1, bitsPerS
   return Buffer.concat([header, pcm]);
 }
 
+export type KeyCheck = { status: "valid" | "invalid" | "unreachable"; message?: string };
+
 /**
- * Checks a key with a cheap "list models" call.
- * Returns "valid", "invalid" (rejected by Google) or "unreachable" (network/timeout/5xx).
+ * Checks a key with a free countTokens call on the configured model (this proves the key may call the
+ * Gemini API, which AI Studio's newer "AQ." auth keys are restricted to). Falls back to listing models
+ * if the model name is unknown. A 429 counts as valid: the key works but its quota is used up right now.
  */
-export async function verifyGeminiKey(key: string): Promise<"valid" | "invalid" | "unreachable"> {
+export async function verifyGeminiKey(key: string): Promise<KeyCheck> {
+  const headers = { "x-goog-api-key": key, "Content-Type": "application/json" };
   try {
-    const res = await fetchWithTimeout(`${apiBase.gemini()}/v1beta/models?pageSize=1`, {
-      headers: { "x-goog-api-key": key },
+    let res = await fetchWithTimeout(`${apiBase.gemini()}/v1beta/models/${encodeURIComponent(geminiModel())}:countTokens`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "hello" }] }] }),
     });
-    if (res.ok || res.status === 429) return "valid"; // 429 = key works but quota is used up right now
-    if (res.status >= 500) return "unreachable";
-    return "invalid";
+    if (res.status === 404) res = await fetchWithTimeout(`${apiBase.gemini()}/v1beta/models?pageSize=1`, { headers });
+    if (res.ok || res.status === 429) return { status: "valid" };
+    if (res.status >= 500) return { status: "unreachable" };
+    let message: string | undefined;
+    try {
+      const body = (await res.json()) as { error?: { message?: string } };
+      message = body.error?.message?.slice(0, 300);
+    } catch {
+      message = undefined;
+    }
+    return { status: "invalid", message };
   } catch {
-    return "unreachable";
+    return { status: "unreachable" };
   }
 }

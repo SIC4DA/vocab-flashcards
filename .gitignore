@@ -53,3 +53,5 @@ next-env.d.ts
 
 # typescript build info
 *.tsbuildinfo
+
+secret.txt

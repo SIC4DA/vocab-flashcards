@@ -19,7 +19,7 @@ import {
   type QuestionType,
   type StudyCard,
 } from "@/lib/learn";
-import { stopSpeaking } from "@/lib/tts";
+import { prefetchPronunciation, stopSpeaking } from "@/lib/tts";
 import { useApp, useConfirm, useToast } from "../providers";
 import { Confetti, ProgressBar } from "../ui";
 import {
@@ -143,6 +143,13 @@ export function StudySession({
   useEffect(() => {
     shownAt.current = performance.now();
   }, [current?.key]);
+
+  // Look up the next word's recording in advance so it plays instantly.
+  const nextCard = queue[pos + 1] ? cards[queue[pos + 1].cardId] : undefined;
+  useEffect(() => {
+    if (card) prefetchPronunciation(card.term, card.termLang);
+    if (nextCard) prefetchPronunciation(nextCard.term, nextCard.termLang);
+  }, [card, nextCard]);
 
   const typeFor = useCallback(
     (c: StudyCard, p: Progress): QuestionType => {

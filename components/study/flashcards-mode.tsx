@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isTypingTarget } from "@/lib/client/keys";
 import { shuffle, type StudyCard } from "@/lib/learn";
-import { stopSpeaking } from "@/lib/tts";
+import { prefetchPronunciation, stopSpeaking } from "@/lib/tts";
 import { useSpeak } from "../audio";
 import { useApp } from "../providers";
 import { ProgressBar } from "../ui";
@@ -27,6 +27,10 @@ export function FlashcardsMode({ cards, title, exitHref }: { cards: StudyCard[];
 
   useEscToExit(exitHref, !done);
   const card = deck[index];
+  const next = deck[index + 1];
+  useEffect(() => {
+    if (next) prefetchPronunciation(next.term, next.termLang);
+  }, [next]);
 
   useEffect(() => {
     if (!card || done) return;

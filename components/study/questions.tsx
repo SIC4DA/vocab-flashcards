@@ -99,7 +99,7 @@ function Prompt({ card, show }: { card: StudyCard; show: "term" | "definition" |
   }
   return (
     <div className="flex flex-col items-center gap-3 py-2 text-center sm:flex-row sm:justify-center sm:text-left">
-      <CardImage src={card.imageUrl} alt={card.definition} term={card.term} className="h-28 w-28 sm:h-36 sm:w-36" />
+      <CardImage src={card.imageUrl} alt={card.definition} term={card.term} className="h-28 w-28 sm:h-36 sm:w-36" hideIfMissing />
       <div>
         <p className="text-sm font-semibold uppercase tracking-wide text-muted">Definition</p>
         <div className="flex items-center justify-center gap-2 sm:justify-start">
@@ -379,6 +379,7 @@ export function FlipCard({
         term={card.term}
         attribution={card.imageAttribution}
         showAttribution
+        hideIfMissing
         className="h-32 w-full max-w-60 sm:h-40"
       />
       <div className="flex items-center gap-2">

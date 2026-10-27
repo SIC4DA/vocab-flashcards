@@ -10,8 +10,8 @@ Command: `npm run lint && npm run typecheck && npm test && npm run test:e2e && n
 |---|---|
 | `npm run lint` | ✅ 0 errors, 0 warnings (`--max-warnings=0`) |
 | `npm run typecheck` | ✅ `next typegen && tsc --noEmit`, strict mode, no errors |
-| `npm test` (Vitest) | ✅ **119 tests in 11 files** passed (unit + integration on in-memory PGlite, no network) |
-| `npm run test:e2e` (Playwright) | ✅ **30 tests** passed (15 scenarios × desktop 1280 px and mobile Pixel 7 viewports, Chromium, production build) |
+| `npm test` (Vitest) | ✅ **136 tests in 13 files** passed (unit + integration on in-memory PGlite, no network) |
+| `npm run test:e2e` (Playwright) | ✅ **36 tests** passed (18 scenarios × desktop 1280 px and mobile Pixel 7 viewports, Chromium, production build) |
 | `npm run build` | ✅ migrations step (skipped without `DATABASE_URL`) + `next build`, no warnings |
 
 ### Unit tests (`tests/unit`)
@@ -53,6 +53,15 @@ External HTTP APIs are mocked by a local mock server (server-side calls) and `pa
 | 9 | Edit: reorder, delete with undo, upload a PNG fixture (resized to ≤ 512 px WebP in the browser), save, reload — persisted; unsaved-changes warning | ✅ |
 | 10 | User B opening user A's deck, edit and study URLs → HTTP **404** page; API 404 | ✅ |
 | 11 | Per-user Gemini key: without a key the AI UI is hidden; a wrong key is rejected; a valid key (mocked Google) connects, "Generate deck" and Gemini auto-fill work; removing it turns AI off; another user isn't affected. In-app guide explains when a word is learned (personalised numbers) | ✅ |
+
+| 12 | Native recording plays for “der Hund” (article via device voice, then the Wikimedia recording); sentences fall back to the device voice; English verbs get no picture without AI; with an `AQ.` key, **Organize with AI** sets topics and removes the automatic picture from “to reflect”, and study screens show no empty image box | ✅ |
+
+### Update checks (better sound, smart pictures, topics, new key format)
+
+- Live Wiktionary lookups via `/api/pronounce` (dev server, real network): recordings found for *der Hund*, *die Wurst*, *das Handtuch*, *buchstabieren*, *sprechen*, *guten Morgen* (German), *la manzana*, *el perro* (Spanish, Lingua Libre) and *apple* (en-US); *Ich habe Hunger* correctly returned none.
+- In the in-app browser, pressing 🔊 for *der Hund* played `De-Hund.ogg.mp3` from upload.wikimedia.org under the production CSP.
+- `AQ.`-format keys: accepted by validation, verified via `countTokens`, used for requests (unit + integration + E2E with a mocked Google).
+- Not verified: a real `AQ.` key against Google (none available), and Gemini's real decisions about which words need pictures and how it groups them (tested with mocked responses).
 
 ## 14.2 Manual checklist
 

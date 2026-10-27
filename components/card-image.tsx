@@ -10,6 +10,7 @@ export function CardImage({
   attribution,
   className = "",
   showAttribution = false,
+  hideIfMissing = false,
 }: {
   src: string | null | undefined;
   alt: string;
@@ -17,8 +18,11 @@ export function CardImage({
   attribution?: string | null;
   className?: string;
   showAttribution?: boolean;
+  /** Render nothing when the card has no picture (words that don't need one). */
+  hideIfMissing?: boolean;
 }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (!src && hideIfMissing) return null;
   const ok = src && failedSrc !== src;
   return (
     <figure className={`flex flex-col items-center ${className}`}>

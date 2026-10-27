@@ -144,7 +144,7 @@ function GeminiKeySection() {
           <li>
             Click <b>Create API key</b> (accept the terms if asked; pick or create any project).
           </li>
-          <li>Copy the key (it starts with “AIza…”) and paste it below, then press <b>Save key</b>.</li>
+          <li>Copy the key — new keys start with <b>“AQ.”</b> (older ones with “AIza”) — paste it below, then press <b>Save key</b>.</li>
         </ol>
         <p className="mt-2 text-muted">
           The free tier is enough for personal study. Usage counts against <i>your</i> key only. Your key is checked with
@@ -162,7 +162,7 @@ function GeminiKeySection() {
             className="input min-w-0 flex-1"
             autoComplete="off"
             spellCheck={false}
-            placeholder="AIza…"
+            placeholder="AQ.…"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             aria-invalid={Boolean(error)}
@@ -273,11 +273,18 @@ export function SettingsView() {
           <Toggle
             id="s-cloud"
             label="Prefer cloud voice"
-            hint="Use Gemini text-to-speech (your key) instead of your browser's voices"
+            hint="For words without a recording, use Gemini's natural voice (your key) instead of your device's voice. Gemini's free voice quota is small, so clips are cached and the device voice takes over when it runs out."
             checked={settings.preferCloudVoice}
             onChange={(v) => save({ preferCloudVoice: v })}
           />
         )}
+        <Toggle
+          id="s-recordings"
+          label="Use native-speaker recordings"
+          hint="Real recordings from Wiktionary when one exists for the word (best quality, free). Otherwise a voice is used."
+          checked={settings.useRecordings}
+          onChange={(v) => save({ useRecordings: v })}
+        />
         <Toggle id="s-sounds" label="Sound effects" hint="Short tones for right and wrong answers" checked={settings.soundEffects} onChange={(v) => save({ soundEffects: v })} />
       </section>
 

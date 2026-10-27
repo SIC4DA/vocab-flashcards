@@ -140,7 +140,7 @@ That means the tables were created. This runs automatically on every deploy and 
 
 Every user does this for themselves in the app; nothing is needed in Vercel.
 
-1. Go to <https://aistudio.google.com/apikey> → sign in with Google → **Create API key** → copy it (it starts with `AIza`).
+1. Go to <https://aistudio.google.com/apikey> → sign in with Google → **Create API key** → copy it. New keys start with `AQ.`; older `AIza…` keys work too.
 2. In the app: **⚙️ Settings** → **✨ AI features** → paste the key → **Save key**.
 3. It should say **Connected · key …xxxx**. You now have ✨ Generate deck, better auto-fill, cloud voice, and speech transcription in Firefox. Usage counts only against your own free quota.
 
@@ -181,7 +181,7 @@ git commit -m "Describe your change"
 git push
 ```
 
-Vercel notices the push and deploys automatically in 1–2 minutes. Database changes (migrations) are applied automatically during the build.
+Vercel notices the push and deploys automatically in 1–2 minutes. Database changes (migrations) are applied automatically during the build. Your users, decks, progress and saved Gemini keys are kept: migrations only add new columns and tables.
 
 ---
 
@@ -196,7 +196,7 @@ Vercel notices the push and deploys automatically in 1–2 minutes. Database cha
 | Everyone got logged out, and Gemini says "Not connected" | `SESSION_SECRET` was changed. Log in again and paste your Gemini key again. |
 | **Speak** is greyed out | Firefox doesn't support speech recognition. Use Chrome, Edge or Safari, or add your Gemini key, which lets Firefox transcribe recordings. Also check Settings → "Enable speaking questions". |
 | No sound | Click 🔊 once (browsers block sound until you interact), turn up the volume, check the iPhone silent switch. If the app says your device has no voice for a language, install one in your system's language/speech settings, or add a Gemini key and turn on "Prefer cloud voice". |
-| Gemini key: "Google rejected this key" | Copy the key again from AI Studio (the whole `AIza…` string, no spaces). |
+| Gemini key: "Google rejected this key" | Copy the key again from AI Studio (the whole `AQ.…` or `AIza…` string, no spaces). The message shows Google's reason. |
 | AI features stop working for a while | Your free Gemini quota is used up for now. The app falls back to the free features automatically; try again later. |
 | A user forgot their password | There's no email reset by design. See below. |
 

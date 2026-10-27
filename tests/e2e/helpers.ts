@@ -3,6 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 
 const THUMB = fs.readFileSync(path.join(__dirname, "fixtures/thumb.png"));
+const WAV = fs.readFileSync(path.join(__dirname, "fixtures/word.wav"));
 
 /** Deterministic Web Speech API mocks (TTS + recognition), injected before any page script. */
 const SPEECH_MOCK = () => {
@@ -42,6 +43,15 @@ const SPEECH_MOCK = () => {
   };
   Object.defineProperty(window, "speechSynthesis", { value: synth, configurable: true });
   Object.defineProperty(window, "SpeechSynthesisUtterance", { value: Utterance, configurable: true });
+
+  // Track <audio> playback (native recordings / cloud voice)
+  const played: string[] = [];
+  w.__played = played;
+  const origPlay = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+    played.push(this.src);
+    return origPlay.call(this);
+  };
 
   // Recognition: window.__speech = { mode: "answer" | "wrong" | "denied", answer: string }
   w.__speech = { mode: "answer", answer: "" };
@@ -100,6 +110,10 @@ export const test = base.extend<Fixtures & { allowList: RegExp[] }>({
     await page.addInitScript(SPEECH_MOCK);
     await page.route("https://images.e2e.test/**", (route) =>
       route.fulfill({ status: 200, contentType: "image/png", body: THUMB }),
+    );
+    // Native-speaker recordings (Wikimedia) are served from a local fixture.
+    await page.route("https://upload.wikimedia.org/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: WAV }),
     );
     await provide(page);
   },

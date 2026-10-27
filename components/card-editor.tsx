@@ -26,6 +26,9 @@ type Row = {
   /** URL currently displayed (uploaded image endpoint, external URL, or local preview). */
   preview: string | null;
   hasUploadedImage: boolean;
+  imageSource: string | null;
+  noImage: boolean;
+  groupLabel: string | null;
   removeUpload?: boolean;
   pendingUpload?: Blob;
 };
@@ -41,6 +44,9 @@ const emptyRow = (): Row => ({
   imageAttribution: null,
   preview: null,
   hasUploadedImage: false,
+  imageSource: null,
+  noImage: false,
+  groupLabel: null,
 });
 
 function fromCard(c: CardDTO): Row {
@@ -54,10 +60,16 @@ function fromCard(c: CardDTO): Row {
     imageAttribution: c.imageAttribution,
     preview: c.displayImageUrl,
     hasUploadedImage: c.hasUploadedImage,
+    imageSource: c.imageSource,
+    noImage: c.noImage,
+    groupLabel: c.groupLabel,
   };
 }
 
 const isBlank = (r: Row) => !r.term.trim() && !r.definition.trim() && !r.example.trim() && !r.preview;
+
+const chunk = <T,>(items: T[], size: number) =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size));
 
 async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
   let i = 0;
@@ -216,6 +228,8 @@ export function DeckEditor({ deck, cards }: { deck?: DeckDTO; cards?: CardDTO[] 
         preview: URL.createObjectURL(blob),
         imageUrl: null,
         imageAttribution: null,
+        imageSource: "upload",
+        noImage: false,
         removeUpload: false,
       });
     } catch (err) {
@@ -234,6 +248,8 @@ export function DeckEditor({ deck, cards }: { deck?: DeckDTO; cards?: CardDTO[] 
     updateRow(row.key, {
       imageUrl: url.trim(),
       imageAttribution: null,
+      imageSource: "url",
+      noImage: false,
       preview: url.trim(),
       pendingUpload: undefined,
       removeUpload: row.hasUploadedImage,
@@ -244,6 +260,8 @@ export function DeckEditor({ deck, cards }: { deck?: DeckDTO; cards?: CardDTO[] 
     updateRow(row.key, {
       imageUrl: null,
       imageAttribution: null,
+      imageSource: "none",
+      noImage: true,
       preview: null,
       pendingUpload: undefined,
       removeUpload: row.hasUploadedImage,
@@ -290,6 +308,8 @@ export function DeckEditor({ deck, cards }: { deck?: DeckDTO; cards?: CardDTO[] 
             example: r.example,
             imageUrl: r.imageUrl,
             imageAttribution: r.imageAttribution,
+            imageSource: r.pendingUpload ? "upload" : r.imageSource,
+            noImage: r.noImage,
             keepUploadedImage: r.removeUpload ? false : undefined,
           })),
         },
@@ -308,7 +328,34 @@ export function DeckEditor({ deck, cards }: { deck?: DeckDTO; cards?: CardDTO[] 
         }
       }
       const uploadedIds = new Set(uploads.map((u) => u.card.id));
-      const missing = saved.filter((c) => !c.imageUrl && !c.hasUploadedImage && !uploadedIds.has(c.id));
+      const noImageIds = new Set(saved.filter((c) => c.noImage).map((c) => c.id));
+
+      // With the user's Gemini key: decide which words need a picture + group them by topic.
+      if (gemini) {
+        const todo = saved.filter((c) => !c.groupLabel).map((c) => c.id);
+        const batches = chunk(todo, 60);
+        let organizeFailed = false;
+        for (let b = 0; b < batches.length; b++) {
+          setSaving(`Organising with AI… ${Math.min((b + 1) * 60, todo.length)}/${todo.length}`);
+          try {
+            const res = await api<{ cards: { id: string; noImage: boolean }[] }>(`/api/decks/${deckId}/organize`, {
+              body: { cardIds: batches[b] },
+            });
+            for (const c of res.cards) {
+              if (c.noImage) noImageIds.add(c.id);
+              else noImageIds.delete(c.id);
+            }
+          } catch {
+            organizeFailed = true;
+            break;
+          }
+        }
+        if (organizeFailed) toast.show("AI organising didn't finish — you can retry from the deck page.", { kind: "error" });
+      }
+
+      const missing = saved.filter(
+        (c) => !c.imageUrl && !c.hasUploadedImage && !uploadedIds.has(c.id) && !noImageIds.has(c.id),
+      );
       if (missing.length) {
         let done = 0;
         setSaving(`Finding images… 0/${missing.length}`);
@@ -637,6 +684,8 @@ export function DeckEditor({ deck, cards }: { deck?: DeckDTO; cards?: CardDTO[] 
             updateRow(picker.key, {
               imageUrl: img.thumbUrl,
               imageAttribution: img.attribution,
+              imageSource: "picked",
+              noImage: false,
               preview: img.thumbUrl,
               pendingUpload: undefined,
               removeUpload: row?.hasUploadedImage,
@@ -689,6 +738,8 @@ function ImageSlot({
       >
         {row.preview ? (
           <CardImage src={row.preview} alt={row.definition || row.term} term={row.term || "?"} className="h-full p-1" />
+        ) : row.noImage ? (
+          <span className="px-1 text-xs">No picture needed · tap to add</span>
         ) : (
           <span className="px-1 text-xs">Auto image on save</span>
         )}

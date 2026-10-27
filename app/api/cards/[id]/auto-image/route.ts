@@ -13,7 +13,15 @@ export const POST = route(async (req, ctx: RouteContext<"/api/cards/[id]/auto-im
   const { id } = await ctx.params;
   const { card, deck } = await getOwnedCard(user.id, id);
   const result = await autoFillImage(
-    { id: card.id, definition: card.definition, imageUrl: card.imageUrl, hasUpload: card.imageData !== null },
+    {
+      id: card.id,
+      definition: card.definition,
+      imageUrl: card.imageUrl,
+      hasUpload: card.imageData !== null,
+      noImage: card.noImage,
+      imageQuery: card.imageQuery,
+      groupLabel: card.groupLabel,
+    },
     deck.definitionLang,
     userGeminiKey(user),
   );

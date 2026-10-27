@@ -32,6 +32,11 @@ export type CardDTO = {
   displayImageUrl: string | null;
   hasUploadedImage: boolean;
   imageAttribution: string | null;
+  imageSource: string | null;
+  /** This word doesn't need a picture (AI/heuristic decision, or the user removed it). */
+  noImage: boolean;
+  /** Topic group suggested by AI. */
+  groupLabel: string | null;
   progress: Progress;
 };
 
@@ -76,6 +81,10 @@ const cardColumns = {
   imageUrl: schema.cards.imageUrl,
   imageMime: schema.cards.imageMime,
   imageAttribution: schema.cards.imageAttribution,
+  imageSource: schema.cards.imageSource,
+  noImage: schema.cards.noImage,
+  imageQuery: schema.cards.imageQuery,
+  groupLabel: schema.cards.groupLabel,
   createdAt: schema.cards.createdAt,
   updatedAt: schema.cards.updatedAt,
   hasImageData: sql<boolean>`${schema.cards.imageData} is not null`,
@@ -97,6 +106,9 @@ export function toCardDTO(c: CardRow, p: CardProgress | null | undefined): CardD
     displayImageUrl: displayImageUrl(c),
     hasUploadedImage: c.hasImageData,
     imageAttribution: c.imageAttribution,
+    imageSource: c.imageSource,
+    noImage: c.noImage,
+    groupLabel: c.groupLabel,
     progress: toProgress(p),
   };
 }
@@ -124,6 +136,7 @@ export function toStudyCard(deck: Pick<Deck, "id" | "termLang" | "definitionLang
     example: c.example,
     imageUrl: c.displayImageUrl,
     imageAttribution: c.imageAttribution,
+    group: c.groupLabel,
     termLang: deck.termLang,
     definitionLang: deck.definitionLang,
     progress: c.progress,
@@ -242,15 +255,16 @@ export async function upsertCards(deckId: string, inputs: CardInput[]): Promise<
   const db = await getDb();
   await db.transaction(async (tx) => {
     const existing = await tx
-      .select({ id: schema.cards.id })
+      .select({ id: schema.cards.id, term: schema.cards.term, definition: schema.cards.definition })
       .from(schema.cards)
       .where(eq(schema.cards.deckId, deckId));
-    const existingIds = new Set(existing.map((e) => e.id));
+    const byId = new Map(existing.map((e) => [e.id, e]));
+    const existingIds = new Set(byId.keys());
     const keep = new Set<string>();
 
     for (let i = 0; i < inputs.length; i++) {
       const c = inputs[i];
-      const base = {
+      const base: Partial<typeof schema.cards.$inferInsert> = {
         position: i,
         term: c.term,
         definition: c.definition,
@@ -258,6 +272,8 @@ export async function upsertCards(deckId: string, inputs: CardInput[]): Promise<
         imageUrl: c.imageUrl ?? null,
         imageAttribution: c.imageAttribution ?? null,
       };
+      if (c.imageSource !== undefined) base.imageSource = c.imageSource;
+      if (c.noImage !== undefined) base.noImage = c.noImage;
       if (c.id && existingIds.has(c.id)) {
         keep.add(c.id);
         const update: Partial<typeof schema.cards.$inferInsert> = { ...base };
@@ -265,9 +281,15 @@ export async function upsertCards(deckId: string, inputs: CardInput[]): Promise<
           update.imageData = null;
           update.imageMime = null;
         }
+        const before = byId.get(c.id)!;
+        if (before.term !== c.term || before.definition !== c.definition) {
+          // The word changed: AI suggestions (topic, image keyword) must be recomputed.
+          update.groupLabel = null;
+          update.imageQuery = null;
+        }
         await tx.update(schema.cards).set(update).where(eq(schema.cards.id, c.id));
       } else {
-        await tx.insert(schema.cards).values({ deckId, ...base });
+        await tx.insert(schema.cards).values({ deckId, ...base } as typeof schema.cards.$inferInsert);
       }
     }
     const toDelete = [...existingIds].filter((id) => !keep.has(id));
@@ -321,6 +343,10 @@ export async function duplicateDeck(userId: string, deckId: string): Promise<Dec
           imageData: c.imageData,
           imageMime: c.imageMime,
           imageAttribution: c.imageAttribution,
+          imageSource: c.imageSource,
+          noImage: c.noImage,
+          imageQuery: c.imageQuery,
+          groupLabel: c.groupLabel,
         })),
       );
     }
@@ -461,6 +487,15 @@ export async function decksWithDueCards(userId: string, now = new Date()) {
   return rows.map((r) => r.deck);
 }
 
+/** Cards that still need the AI "organize" pass (no topic yet). */
+export async function cardsNeedingOrganize(deckId: string) {
+  const db = await getDb();
+  return db
+    .select({ id: schema.cards.id })
+    .from(schema.cards)
+    .where(and(eq(schema.cards.deckId, deckId), sql`${schema.cards.groupLabel} is null`));
+}
+
 export async function cardsWithoutImages(deckId: string) {
   const db = await getDb();
   return db
@@ -471,6 +506,7 @@ export async function cardsWithoutImages(deckId: string) {
         eq(schema.cards.deckId, deckId),
         sql`${schema.cards.imageUrl} is null`,
         sql`${schema.cards.imageData} is null`,
+        eq(schema.cards.noImage, false),
       ),
     );
 }
