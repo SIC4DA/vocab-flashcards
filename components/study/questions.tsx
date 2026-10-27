@@ -5,21 +5,17 @@ import { checkAnswer, diffSegments, type Verdict } from "@/lib/answer-check";
 import { isTypingTarget } from "@/lib/client/keys";
 import { langDir } from "@/lib/languages";
 import type { Question, StudyCard } from "@/lib/learn";
-import { matchSpeech } from "@/lib/speech-match";
 import { gradeFor, type Grade } from "@/lib/srs";
 import { AudioButton, useSpeak } from "../audio";
 import { CardImage } from "../card-image";
 import { useApp } from "../providers";
 import { SpecialCharsBar } from "../ui";
-import { useSpeechCapture, type SpeechFailure } from "./use-speech";
 
 export type Outcome = {
   correct: boolean;
   grade: Grade;
   answerGiven: string;
   verdict?: Verdict;
-  /** Recognised speech, for display. */
-  heard?: string;
 };
 
 export type QuestionProps = {
@@ -254,102 +250,6 @@ export function WriteQuestion({ question, card, answered, onAnswer }: QuestionPr
   );
 }
 
-/* -------------------------------- Speaking -------------------------------- */
-
-export function SpeakQuestion({
-  question,
-  card,
-  answered,
-  onAnswer,
-  onSwitchToWrite,
-  onSpeechUnavailable,
-}: QuestionProps & {
-  /** "Skip — I can't speak now" / "Type instead": turn this question into a Write question. */
-  onSwitchToWrite: () => void;
-  /** Permission denied or unsupported: remove Speak for the rest of the session. */
-  onSpeechUnavailable: (reason: SpeechFailure) => void;
-}) {
-  const elapsed = useTimer(question.key);
-  const [hint, setHint] = useState("");
-  const speech = useSpeechCapture({
-    lang: card.termLang,
-    onResult: (alts) => {
-      const m = matchSpeech(alts, card.term);
-      onAnswer({
-        correct: m.correct,
-        grade: m.correct ? (m.similarity === 1 ? gradeFor("correct", elapsed()) : 3) : 1,
-        answerGiven: m.heard,
-        heard: m.heard,
-      });
-    },
-    onError: (reason) => {
-      if (reason === "not-allowed" || reason === "unsupported") onSpeechUnavailable(reason);
-      else setHint(reason === "no-speech" ? "I didn't hear anything — tap the mic and try again." : "Something went wrong — try again or type instead.");
-    },
-  });
-
-  useKey((e) => {
-    if (answered || isTypingTarget(e.target)) return;
-    if (e.key === "m" || e.key === "M") {
-      e.preventDefault();
-      speech.toggle();
-    }
-  });
-
-  return (
-    <div>
-      <Prompt card={card} show="definition" />
-      <div className="mt-4 flex flex-col items-center gap-3">
-        <p className="text-sm font-semibold text-muted">Say the term in the target language</p>
-        <button
-          type="button"
-          className={`grid h-24 w-24 place-items-center rounded-full text-4xl shadow-card transition-colors ${
-            speech.listening ? "animate-listen bg-danger text-white" : "bg-accent text-on-accent hover:bg-accent-strong"
-          }`}
-          onPointerDown={(e) => {
-            if (e.pointerType === "touch" && !speech.listening) void speech.start();
-          }}
-          onPointerUp={(e) => {
-            if (e.pointerType === "touch" && speech.listening) speech.stop();
-          }}
-          onClick={(e) => {
-            // Touch uses hold-to-talk (pointer events); mouse/keyboard click toggles.
-            if ((e.nativeEvent as PointerEvent).pointerType === "touch") return;
-            speech.toggle();
-          }}
-          disabled={Boolean(answered) || speech.processing}
-          aria-pressed={speech.listening}
-          aria-label={speech.listening ? "Stop listening (M)" : "Start speaking (M)"}
-          data-testid="mic-button"
-        >
-          <span aria-hidden>🎤</span>
-        </button>
-        <p className="min-h-7 text-center text-lg" aria-live="polite" data-testid="transcript">
-          {speech.processing ? "Transcribing…" : speech.transcript || (speech.listening ? "Listening…" : "")}
-        </p>
-        {hint && !answered && <p className="text-sm text-warning">{hint}</p>}
-        {!answered && (
-          <div className="flex flex-wrap justify-center gap-2">
-            <button type="button" className="btn-secondary" onClick={onSwitchToWrite} data-testid="skip-speak">
-              Skip — I can&apos;t speak now
-            </button>
-            <button type="button" className="btn-ghost" onClick={onSwitchToWrite}>
-              Type instead
-            </button>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => onAnswer({ correct: false, grade: 1, answerGiven: "" })}
-            >
-              Don&apos;t know
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /* ------------------------------- Flashcard ------------------------------- */
 
 export function FlipCard({
@@ -511,11 +411,6 @@ export function Feedback({
       <p className={`flex items-center gap-2 text-lg font-bold ${outcome.correct ? "text-success" : "text-danger"}`}>
         <span aria-hidden>{outcome.correct ? "✓" : "✗"}</span> {title}
       </p>
-      {outcome.heard !== undefined && (
-        <p className="mt-1 text-sm">
-          Heard: <b data-testid="heard">{outcome.heard || "—"}</b>
-        </p>
-      )}
       {(!outcome.correct || v === "accent" || v === "typo") && (
         <div className="mt-2">
           <p className="text-sm text-muted">Correct answer</p>
@@ -532,7 +427,7 @@ export function Feedback({
             <AudioButton text={card.term} lang={card.termLang} size="sm" />
           </p>
           <p className="text-sm text-muted">{card.definition}</p>
-          {outcome.answerGiven && !outcome.correct && outcome.heard === undefined && (
+          {outcome.answerGiven && !outcome.correct && (
             <p className="mt-1 text-sm">
               You wrote: <span className="line-through">{outcome.answerGiven}</span>
             </p>

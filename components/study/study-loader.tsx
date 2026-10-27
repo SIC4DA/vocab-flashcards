@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiClientError, tzOffset } from "@/lib/client/api";
-import { useApp } from "../providers";
 import { FlashcardsMode } from "./flashcards-mode";
 import { MatchGame } from "./match-game";
 import { StudySession, type QueuePayload } from "./session";
 import { TestRunner } from "./test-runner";
 
-export type StudyMode = "learn" | "flashcards" | "write" | "listen" | "speak" | "match" | "test" | "review";
+export type StudyMode = "learn" | "flashcards" | "write" | "listen" | "match" | "test" | "review";
 
 function SessionSkeleton() {
   return (
@@ -38,42 +37,19 @@ export function StudyLoader({
   cardCount: number;
   matchBestMs?: number | null;
 }) {
-  const { speakAvailable, speechSupported } = useApp();
   const [payload, setPayload] = useState<QueuePayload | null>(null);
+  const [bonus, setBonus] = useState(0);
   const [error, setError] = useState("");
   const exitHref = deckId ? `/decks/${deckId}` : "/";
-  const ready = speechSupported !== null; // wait for client-side feature detection
 
   useEffect(() => {
-    if (!ready || mode === "test") return;
-    if (mode === "speak" && !speakAvailable) return;
-    const params = new URLSearchParams({ mode, speak: speakAvailable ? "1" : "0", tz: String(tzOffset()) });
+    if (mode === "test") return;
+    const params = new URLSearchParams({ mode, tz: String(tzOffset()), bonus: String(bonus) });
     if (deckId) params.set("deckId", deckId);
     api<QueuePayload>(`/api/study/queue?${params}`)
       .then(setPayload)
       .catch((err) => setError(err instanceof ApiClientError ? err.message : "Couldn't load this session"));
-  }, [ready, mode, deckId, speakAvailable]);
-
-  if (mode === "speak" && ready && !speakAvailable) {
-    return (
-      <div className="panel mx-auto max-w-xl p-6 text-center">
-        <h1 className="text-2xl font-bold">Speaking isn&apos;t available</h1>
-        <p className="mt-2 text-muted">
-          {speechSupported === false
-            ? "This browser doesn't support speech recognition (Firefox doesn't). Try Chrome, Edge or Safari."
-            : "Speaking questions are turned off in Settings."}
-        </p>
-        <div className="mt-6 flex justify-center gap-3">
-          <Link href={`/decks/${deckId}/study/write`} className="btn-primary">
-            Practise writing instead
-          </Link>
-          <Link href={exitHref} className="btn-secondary">
-            Back
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  }, [mode, deckId, bonus]);
 
   if (mode === "test" && deckId) return <TestRunner deckId={deckId} cardCount={cardCount} title={title} exitHref={exitHref} />;
   if (error) {
@@ -96,6 +72,22 @@ export function StudyLoader({
         <MatchGame deckId={deckId!} cards={payload.cards} title={title} exitHref={exitHref} initialBestMs={matchBestMs ?? null} />
       );
     default:
-      return <StudySession mode={mode as "learn"} payload={payload} title={title} exitHref={exitHref} />;
+      return (
+        <StudySession
+          key={`${bonus}`}
+          mode={mode as "learn"}
+          payload={payload}
+          title={title}
+          exitHref={exitHref}
+          onKeepGoing={
+            mode === "learn" && bonus < 3
+              ? () => {
+                  setPayload(null);
+                  setBonus((b) => b + 1);
+                }
+              : undefined
+          }
+        />
+      );
   }
 }

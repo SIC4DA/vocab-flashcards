@@ -102,3 +102,23 @@ Everything below was either unspecified in the requirements or needed an interpr
 66. Study screens show no image box for words without a picture; the first-letter placeholder is now only used when an image fails to load.
 67. **Topics in Learn.** Due cards and cards in progress still come first (spaced repetition must not be overridden). Only the choice of *new* words uses topics: the topic most present among words in progress continues first (if it still has new words), otherwise the next topic in deck order. Cards in progress of the same topic are asked together. Without topics, new words come in deck order (they were never random). Gemini is asked to group by theme or situation rather than near-synonyms, since learning many look-alike words at once tends to cause mix-ups.
 
+## Update: speaking practice removed
+
+68. **Speaking was removed at the owner's request** (it added little and speech recognition was unreliable): the Speak mode, Speak questions in Learn / Review / Test, the microphone UI, the `M` shortcut, the "Enable speaking questions" setting, `/api/transcribe` and the Gemini transcription fallback. Microphone access is now denied via `Permissions-Policy`. Pronunciation (listening) is unchanged.
+69. Stage numbers are kept so stored progress stays valid: a word goes from Written (4) straight to Mastered (6). Migration `0003` moves words that were waiting on the old Spoken stage (5) to Mastered (they had already passed every writing step). Older "speak" accuracy statistics are hidden.
+70. Mastered-word reviews are now Write 60%, Listen & write 25%, multiple choice 15% (the old weights without speaking, rounded).
+71. This supersedes the earlier speaking-related entries above (speech checking, hold-to-talk, microphone fallbacks, Speak in Test).
+
+## Update: Learn redesigned as a daily session
+
+72. **Problem found.** A simulation of the previous Learn (10 new words, 2 correct answers per step, mistakes drop a step, session runs until every word is Mastered) needed **112 questions at 90% accuracy and 299 at 75%**, with one word shown **up to 54 times** in a single sitting. That was the "endless, repetitive" feeling. Not a bug, but the design crammed everything into one session.
+73. **Daily session.** Learn now plans a finite session when it starts: due reviews, then words in progress that still have steps left today (current topic first), then up to "new words per day" new words from the current topic. It runs in rounds and ends when every planned word is done for today:
+    - review word: one correct answer;
+    - learning/new word: climbed `stepsPerDay` steps today (default 2), or reached Mastered;
+    - any word: 3 mistakes today (`MAX_WRONG_PER_DAY`), after which it rests until tomorrow.
+    Seeing a new word is free. Mistakes don't use up the day's allowance, because progress is measured from the stage the word had at its first answer of the day (`day_start_stage`), and are bounded by the 3-mistake cap. The counters live in `card_progress` (`day_key`, `day_start_stage`, `day_wrong`, `day_correct`) and use the browser's local day.
+74. **Defaults.** "Correct answers to move up a step" now defaults to 1 (was 2); migration `0004` moves accounts that still had the old default. Together with 2 steps per day, a new word goes see → MC → listening on day 1, then dictation → writing → Mastered on day 2, then SM-2 reviews. Simulated over 14 days with a 40-word deck: about 27 questions/day at 90% accuracy and 37 at 75% (longest day 61), never more than 6 sightings of one word per day, and all 40 words mastered by day 10 (90%).
+75. **"Keep going anyway"** after the session starts a bonus session (+1 step per word, +5 new words), at most 3 times per day. It's offered, not pushed.
+76. **Topics.** AI topic labels when present (cards without one go to "Other"); otherwise sets of 8 words in deck order (`SET_SIZE`). New words only come from the current topic: the first one that isn't finished. A topic is finished when all its words have been seen and at least 75% are at Written or above (`TOPIC_DONE_SHARE`). Requiring 100% let one or two hard words block new topics for 9 days in the simulation. The deck page shows a Topics/Sets panel with per-topic progress and the current topic; the Learn header shows the current topic; the end screen announces a finished topic and offers to start the next one.
+77. Learn's tile is the highlighted, first mode on the deck page ("Your daily session").
+

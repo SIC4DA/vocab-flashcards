@@ -66,6 +66,10 @@ export function toProgress(p: CardProgress | null | undefined): Progress {
     dueAt: iso(p.dueAt),
     lastReviewedAt: iso(p.lastReviewedAt),
     modeStats: p.modeStats ?? {},
+    dayKey: p.dayKey,
+    dayStartStage: p.dayStartStage,
+    dayWrong: p.dayWrong,
+    dayCorrect: p.dayCorrect,
   };
 }
 
@@ -380,6 +384,10 @@ export async function saveProgress(cardId: string, p: Progress, db?: DB) {
     correctStreak: p.correctStreak,
     lastReviewedAt: p.lastReviewedAt ? new Date(p.lastReviewedAt) : null,
     modeStats: p.modeStats,
+    dayKey: p.dayKey ?? null,
+    dayStartStage: p.dayStartStage ?? 0,
+    dayWrong: p.dayWrong ?? 0,
+    dayCorrect: p.dayCorrect ?? 0,
   };
   const { cardId: _ignored, ...update } = values;
   void _ignored;

@@ -99,7 +99,6 @@ export const REVIEW_MODES = [
   "flashcards",
   "write",
   "listen",
-  "speak",
   "match",
   "test",
 ] as const;
@@ -111,11 +110,12 @@ export const QUESTION_TYPES = [
   "listen_mc",
   "dictation",
   "write",
-  "speak",
   "true_false",
 ] as const;
 
 export const reviewSchema = z.object({
+  /** Browser timezone offset in minutes (for the daily Learn counters). */
+  tz: z.number().int().min(-840).max(840).optional(),
   cardId: z.string().uuid(),
   mode: z.enum(REVIEW_MODES),
   questionType: z.enum(QUESTION_TYPES).optional(),
@@ -125,7 +125,6 @@ export const reviewSchema = z.object({
   responseMs: z.number().int().min(0).max(3_600_000).default(0),
   /** Flashcards mode only: "know it" (true) or "still learning" (false). */
   known: z.boolean().optional(),
-  speakAvailable: z.boolean().optional(),
 });
 
 export const translateSchema = z.object({
@@ -187,10 +186,11 @@ export const settingsSchema = z.object({
   speechRate: z.number().min(0.5).max(1.5).default(0.9),
   preferCloudVoice: z.boolean().default(false),
   useRecordings: z.boolean().default(true),
-  enableSpeaking: z.boolean().default(true),
   strictAccents: z.boolean().default(false),
   ignoreArticles: z.boolean().default(false),
-  advanceAfter: z.number().int().min(1).max(3).default(2),
+  advanceAfter: z.number().int().min(1).max(3).default(1),
+  /** How many ladder steps one word may climb per day in Learn (spacing beats cramming). */
+  stepsPerDay: z.number().int().min(1).max(5).default(2),
   newPerDay: z.number().int().min(1).max(100).default(10),
   roundSize: z.number().int().min(5).max(15).default(7),
   passMark: z.number().int().min(50).max(100).default(80),

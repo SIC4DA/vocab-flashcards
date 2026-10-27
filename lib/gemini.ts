@@ -129,26 +129,6 @@ export async function geminiOrganize(
   );
 }
 
-export async function geminiTranscribe(key: string, audio: Buffer, mimeType: string, lang: string): Promise<string> {
-  const res = await call(key, geminiModel(), {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { inlineData: { mimeType, data: audio.toString("base64") } },
-          {
-            text:
-              `Transcribe exactly what is said in this short ${languageName(lang)} audio clip. ` +
-              `Reply with only the words spoken, in ${languageName(lang)}, without translation or commentary.`,
-          },
-        ],
-      },
-    ],
-    generationConfig: { temperature: 0 },
-  });
-  return textOf(res);
-}
-
 /** Returns raw 16-bit PCM (24 kHz mono) from Gemini TTS. */
 export async function geminiTts(key: string, text: string, lang: string): Promise<{ pcm: Buffer; sampleRate: number }> {
   const res = await call(key, geminiTtsModel(), {

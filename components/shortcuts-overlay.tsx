@@ -9,7 +9,6 @@ const SHORTCUTS: [string, string][] = [
   ["Enter", "Submit / continue"],
   ["← / →", "Still learning / know it (flashcards)"],
   ["1 – 4", "Choose a multiple-choice option"],
-  ["M", "Start / stop the microphone"],
   ["Esc", "Exit the session"],
   ["?", "Show this list"],
 ];

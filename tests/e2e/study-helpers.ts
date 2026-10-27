@@ -11,10 +11,6 @@ export async function lastSpokenTerm(page: Page, lang = "es-ES"): Promise<string
   );
 }
 
-export async function setSpeech(page: Page, mode: "answer" | "wrong" | "denied", answer = "") {
-  await page.evaluate(([m, a]) => ((window as unknown as { __speech: unknown }).__speech = { mode: m, answer: a }), [mode, answer]);
-}
-
 export async function clearSpoken(page: Page) {
   await page.evaluate(() => ((window as unknown as { __tts: unknown[] }).__tts.length = 0));
 }
@@ -61,10 +57,6 @@ export async function answerQuestion(
     case "write":
       await page.getByTestId("answer-input").fill(correct ? word.term : "zzzz");
       await page.getByTestId("submit-answer").click();
-      break;
-    case "speak":
-      await setSpeech(page, correct ? "answer" : "wrong", word.term);
-      await page.getByTestId("mic-button").click();
       break;
   }
   const fb = page.getByTestId("feedback");

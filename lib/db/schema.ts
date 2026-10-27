@@ -120,6 +120,11 @@ export const cardProgress = pgTable(
     correctStreak: integer("correct_streak").notNull().default(0),
     lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
     modeStats: jsonb("mode_stats").$type<ModeStats>().notNull().default({}),
+    /** Daily Learn counters (reset when day_key changes). */
+    dayKey: text("day_key"),
+    dayStartStage: integer("day_start_stage").notNull().default(0),
+    dayWrong: integer("day_wrong").notNull().default(0),
+    dayCorrect: integer("day_correct").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

@@ -4,7 +4,11 @@
  */
 import { DAY_MS, dueDate, gradeFor, isDue, learningStep, sm2, type Grade, type SrsState } from "./srs";
 
-export const STAGE_NAMES = ["New", "Seen", "Recognized", "Heard", "Written", "Spoken", "Mastered"] as const;
+/**
+ * Stage 5 ("Spoken") was removed together with speaking practice. Stages keep their numbers so
+ * stored progress stays valid: a card goes from 4 (Written) straight to 6 (Mastered).
+ */
+export const STAGE_NAMES = ["New", "Seen", "Recognized", "Heard", "Written", "Written", "Mastered"] as const;
 export const MAX_STAGE = 6;
 
 export type QuestionType =
@@ -14,7 +18,6 @@ export type QuestionType =
   | "listen_mc"
   | "dictation"
   | "write"
-  | "speak"
   | "true_false";
 
 export const QUESTION_LABELS: Record<QuestionType, string> = {
@@ -24,13 +27,18 @@ export const QUESTION_LABELS: Record<QuestionType, string> = {
   listen_mc: "Listening",
   dictation: "Listen & write",
   write: "Write",
-  speak: "Speak",
   true_false: "True / False",
 };
 
 export type ModeStats = Record<string, { correct: number; wrong: number }>;
 
 export type Progress = SrsState & {
+  /** Local day (YYYY-MM-DD) the "today" counters below belong to. */
+  dayKey?: string | null;
+  /** Stage the word was at when it was first practised that day (daily step limit). */
+  dayStartStage?: number;
+  dayWrong?: number;
+  dayCorrect?: number;
   stage: number;
   correctStreak: number;
   dueAt: string | null;
@@ -39,6 +47,10 @@ export type Progress = SrsState & {
 };
 
 export const NEW_PROGRESS: Progress = {
+  dayKey: null,
+  dayStartStage: 0,
+  dayWrong: 0,
+  dayCorrect: 0,
   stage: 0,
   correctStreak: 0,
   ease: 2.5,
@@ -80,8 +92,22 @@ export type Question = {
 
 export type LadderOptions = {
   advanceAfter: number; // 1–3
-  speakAvailable: boolean;
+  /** Local day (YYYY-MM-DD) for the daily counters. */
+  today?: string;
 };
+
+/** After this many mistakes on one word in a day, it rests until tomorrow. */
+export const MAX_WRONG_PER_DAY = 3;
+
+function dayCounters(p: Progress, today: string | undefined) {
+  const same = Boolean(today) && p.dayKey === today;
+  return {
+    dayKey: today ?? p.dayKey ?? null,
+    dayStartStage: same ? (p.dayStartStage ?? p.stage) : p.stage,
+    dayWrong: same ? (p.dayWrong ?? 0) : 0,
+    dayCorrect: same ? (p.dayCorrect ?? 0) : 0,
+  };
+}
 
 export type Rand = () => number;
 
@@ -104,13 +130,12 @@ function downgradeForSmallDeck(type: QuestionType, deckSize: number): QuestionTy
   return type;
 }
 
-/** Review question type for mastered cards: Write 40%, Speak 30%, Listen & write 20%, MC 10%. */
-export function reviewQuestionType(rand: Rand, speakAvailable: boolean, deckSize: number): QuestionType {
+/** Review question type for mastered cards: Write 60%, Listen & write 25%, Multiple choice 15%. */
+export function reviewQuestionType(rand: Rand, deckSize: number): QuestionType {
   const weights: [QuestionType, number][] = [
-    ["write", 40],
-    ["speak", speakAvailable ? 30 : 0],
-    ["dictation", 20],
-    ["mc", canUseMultipleChoice(deckSize) ? 10 : 0],
+    ["write", 60],
+    ["dictation", 25],
+    ["mc", canUseMultipleChoice(deckSize) ? 15 : 0],
   ];
   const total = weights.reduce((s, [, w]) => s + w, 0);
   let r = rand() * total;
@@ -125,7 +150,7 @@ export function reviewQuestionType(rand: Rand, speakAvailable: boolean, deckSize
 export function questionTypeForStage(
   stage: number,
   correctStreak: number,
-  opts: { speakAvailable: boolean; deckSize: number; rand: Rand },
+  opts: { deckSize: number; rand: Rand },
 ): QuestionType {
   let type: QuestionType;
   switch (stage) {
@@ -141,13 +166,11 @@ export function questionTypeForStage(
       type = "dictation";
       break;
     case 4:
+    case 5: // legacy "Spoken" stage
       type = "write";
       break;
-    case 5:
-      type = opts.speakAvailable ? "speak" : "write";
-      break;
     default:
-      type = reviewQuestionType(opts.rand, opts.speakAvailable, opts.deckSize);
+      type = reviewQuestionType(opts.rand, opts.deckSize);
   }
   return downgradeForSmallDeck(type, opts.deckSize);
 }
@@ -241,10 +264,9 @@ function bumpStats(stats: ModeStats, key: string, correct: boolean): ModeStats {
   return { ...stats, [key]: correct ? { ...cur, correct: cur.correct + 1 } : { ...cur, wrong: cur.wrong + 1 } };
 }
 
-function nextStageUp(stage: number, speakAvailable: boolean): number {
-  const next = stage + 1;
-  if (next === 5 && !speakAvailable) return 6;
-  return Math.min(MAX_STAGE, next);
+function nextStageUp(stage: number): number {
+  // Written (4) → Mastered (6); stage 5 (speaking) no longer exists.
+  return stage >= 4 ? MAX_STAGE : stage + 1;
 }
 
 function schedule(p: Progress, stageForSchedule: number, grade: Grade, now: Date) {
@@ -254,11 +276,14 @@ function schedule(p: Progress, stageForSchedule: number, grade: Grade, now: Date
 }
 
 /** Viewing a new card (stage 0 flashcard) moves it to stage 1. */
-export function applyView(p: Progress, now: Date = new Date()): AnswerResult {
+export function applyView(p: Progress, now: Date = new Date(), today?: string): AnswerResult {
   const previousStage = p.stage;
   if (p.stage > 0) return { progress: { ...p, lastReviewedAt: now.toISOString() }, previousStage, stageChanged: 0 };
   const progress: Progress = {
     ...p,
+    // Seeing a new word is free: today's step allowance starts counting from "Seen".
+    ...dayCounters({ ...p, stage: 1 }, today),
+    dayStartStage: 1,
     ...schedule(p, 1, 4, now),
     stage: 1,
     correctStreak: 0,
@@ -288,7 +313,7 @@ export function applyAnswer(
   opts: LadderOptions,
   now: Date = new Date(),
 ): AnswerResult {
-  if (input.type === "flashcard") return applyView(p, now);
+  if (input.type === "flashcard") return applyView(p, now, opts.today);
   const previousStage = p.stage;
   const grade = input.grade ?? gradeFor(input.correct ? "correct" : "wrong", input.responseMs);
   const correct = input.correct && grade >= 3;
@@ -302,7 +327,7 @@ export function applyAnswer(
         stage = 1;
         streak = 0;
       } else if (streak >= opts.advanceAfter) {
-        stage = nextStageUp(stage, opts.speakAvailable);
+        stage = nextStageUp(stage);
         streak = 0;
       }
     } else if (stage === 0) {
@@ -321,9 +346,17 @@ export function applyAnswer(
   if (stage === MAX_STAGE && previousStage < MAX_STAGE) {
     sched = { ...sched, reps: 0, intervalDays: 1, dueAt: dueDate(now, 1).toISOString() };
   }
+  const day = input.ladder ? dayCounters(p, opts.today) : null;
   const progress: Progress = {
     ...p,
     ...sched,
+    ...(day
+      ? {
+          ...day,
+          dayWrong: day.dayWrong + (correct ? 0 : 1),
+          dayCorrect: day.dayCorrect + (correct ? 1 : 0),
+        }
+      : {}),
     stage,
     correctStreak: streak,
     lastReviewedAt: now.toISOString(),
@@ -340,42 +373,134 @@ export function isCardDue(c: StudyCard, now: Date = new Date()) {
   return c.progress.stage >= 1 && isDue(c.progress.dueAt, now);
 }
 
+/* ------------------------------------------------------------------ */
+/* Topics (groups)                                                    */
+/* ------------------------------------------------------------------ */
+
+/** Without AI topics, the deck is split into sets of this many words, in deck order. */
+export const SET_SIZE = 8;
+/** A word counts towards finishing its topic once it can be written (stage ≥ Written). */
+export const TOPIC_DONE_STAGE = 4;
 /**
- * Learn candidates in priority order: due cards first, then cards in progress, then new cards
- * (limited by `newAllowed`). When cards have AI topic groups, new words are introduced topic by
- * topic: the topic you're already learning continues first, then the next topic in deck order.
+ * A topic is "finished" (and the next one starts) when all its words have been introduced and at least
+ * 75% of them can be written. A couple of hard words don't block progress: they keep being practised.
  */
-export function selectLearnCandidates(cards: StudyCard[], opts: { now: Date; newAllowed: number }): StudyCard[] {
-  const due = cards
-    .filter((c) => isCardDue(c, opts.now))
-    .sort((a, b) => new Date(a.progress.dueAt!).getTime() - new Date(b.progress.dueAt!).getTime());
-  const dueIds = new Set(due.map((c) => c.id));
-  const inProgress = cards.filter((c) => !dueIds.has(c.id) && c.progress.stage >= 1 && c.progress.stage < MAX_STAGE);
-  const freshAll = cards.filter((c) => c.progress.stage === 0);
-  const anchor = anchorGroup(inProgress, freshAll);
-  const inAnchor = (c: StudyCard) => (anchor !== null && c.group === anchor ? 0 : 1);
-  inProgress.sort((a, b) => a.progress.stage - b.progress.stage || inAnchor(a) - inAnchor(b));
-  const fresh = anchor === null ? freshAll : [...freshAll.filter((c) => c.group === anchor), ...freshAll.filter((c) => c.group !== anchor)];
-  return [...due, ...inProgress, ...fresh.slice(0, Math.max(0, opts.newAllowed))];
+export const TOPIC_DONE_SHARE = 0.75;
+
+export type Topic = { key: string; label: string; cards: StudyCard[] };
+
+/** Topics in deck order: AI topic labels when present, otherwise "Set 1", "Set 2", … of 8 words. */
+export function deckTopics(cards: StudyCard[]): Topic[] {
+  if (cards.some((c) => c.group)) {
+    const map = new Map<string, Topic>();
+    for (const c of cards) {
+      const label = c.group ?? "Other";
+      if (!map.has(label)) map.set(label, { key: `g:${label}`, label, cards: [] });
+      map.get(label)!.cards.push(c);
+    }
+    return [...map.values()];
+  }
+  const topics: Topic[] = [];
+  for (let i = 0; i < cards.length; i += SET_SIZE) {
+    topics.push({ key: `set:${i / SET_SIZE}`, label: `Set ${i / SET_SIZE + 1}`, cards: cards.slice(i, i + SET_SIZE) });
+  }
+  return topics;
 }
 
-/** The topic to continue: the most common topic among words in progress that still has new words, else the first new word's topic. */
-export function anchorGroup(inProgress: StudyCard[], fresh: StudyCard[]): string | null {
-  const freshGroups = new Set(fresh.map((c) => c.group).filter((g): g is string => Boolean(g)));
-  if (freshGroups.size === 0) return null;
-  const counts = new Map<string, number>();
-  for (const c of inProgress) if (c.group && freshGroups.has(c.group)) counts.set(c.group, (counts.get(c.group) ?? 0) + 1);
-  let bestGroup: string | null = null;
-  let bestCount = 0;
-  for (const [g, n] of counts) if (n > bestCount) [bestGroup, bestCount] = [g, n];
-  return bestGroup ?? fresh.find((c) => c.group)?.group ?? null;
+export const topicFinished = (t: Topic) =>
+  t.cards.every((c) => c.progress.stage >= 1) &&
+  t.cards.filter((c) => c.progress.stage >= TOPIC_DONE_STAGE).length >= Math.ceil(t.cards.length * TOPIC_DONE_SHARE);
+
+/** The topic new words come from: the first one that isn't finished yet. */
+export function currentTopic(topics: Topic[]): Topic | null {
+  return topics.find((t) => !topicFinished(t)) ?? null;
 }
 
-export function selectRound(
+export function topicSummary(topics: Topic[]) {
+  const current = currentTopic(topics);
+  return topics.map((t) => ({
+    key: t.key,
+    label: t.label,
+    total: t.cards.length,
+    new: t.cards.filter((c) => c.progress.stage === 0).length,
+    written: t.cards.filter((c) => c.progress.stage >= TOPIC_DONE_STAGE).length,
+    mastered: t.cards.filter((c) => c.progress.stage >= MAX_STAGE).length,
+    finished: topicFinished(t),
+    current: current?.key === t.key,
+  }));
+}
+
+/* ------------------------------------------------------------------ */
+/* Daily Learn session                                                */
+/* ------------------------------------------------------------------ */
+
+export type SessionKind = "review" | "learning" | "new";
+export type SessionItem = { id: string; kind: SessionKind };
+
+/**
+ * Has this word done its share for today?
+ *  - reviews (mastered words that were due): one correct answer;
+ *  - learning / new words: climbed `stepsPerDay` stages today, or reached Mastered;
+ *  - any word: 3 mistakes today (it rests until tomorrow).
+ */
+export function doneToday(p: Progress, kind: SessionKind, today: string, stepsPerDay: number): boolean {
+  if (p.dayKey !== today) return false;
+  if ((p.dayWrong ?? 0) >= MAX_WRONG_PER_DAY) return true;
+  if (kind === "review") return (p.dayCorrect ?? 0) >= 1;
+  if (p.stage >= MAX_STAGE) return true;
+  return p.stage - (p.dayStartStage ?? p.stage) >= stepsPerDay;
+}
+
+/**
+ * Today's Learn session for one deck:
+ *  1. mastered words that are due (spaced-repetition reviews),
+ *  2. words in progress that still have steps left today (current topic first),
+ *  3. up to `newAllowed` new words — only from the current topic.
+ * The session is finite: it ends when every word in it is done for today.
+ */
+export function planLearnSession(
   cards: StudyCard[],
-  opts: { now: Date; newAllowed: number; roundSize: number },
-): StudyCard[] {
-  return selectLearnCandidates(cards, opts).slice(0, opts.roundSize);
+  opts: { now: Date; today: string; newAllowed: number; stepsPerDay: number },
+): { items: SessionItem[]; topic: Topic | null } {
+  const topics = deckTopics(cards);
+  const topic = currentTopic(topics);
+  const inTopic = (c: StudyCard) => (topic && topic.cards.includes(c) ? 0 : 1);
+  const reviews = cards
+    .filter((c) => c.progress.stage >= MAX_STAGE && isDue(c.progress.dueAt, opts.now))
+    .sort((a, b) => new Date(a.progress.dueAt!).getTime() - new Date(b.progress.dueAt!).getTime());
+  const learning = cards
+    .filter((c) => c.progress.stage >= 1 && c.progress.stage < MAX_STAGE)
+    .filter((c) => !doneToday(c.progress, "learning", opts.today, opts.stepsPerDay))
+    .sort((a, b) => inTopic(a) - inTopic(b) || a.progress.stage - b.progress.stage);
+  const fresh = (topic?.cards ?? []).filter((c) => c.progress.stage === 0).slice(0, Math.max(0, opts.newAllowed));
+  return {
+    items: [
+      ...reviews.map((c) => ({ id: c.id, kind: "review" as const })),
+      ...learning.map((c) => ({ id: c.id, kind: "learning" as const })),
+      ...fresh.map((c) => ({ id: c.id, kind: "new" as const })),
+    ],
+    topic,
+  };
+}
+
+/** Review-all-due session (all decks): every due word once. */
+export function planReviewSession(cards: StudyCard[], now: Date): SessionItem[] {
+  return cards
+    .filter((c) => isCardDue(c, now))
+    .sort((a, b) => new Date(a.progress.dueAt!).getTime() - new Date(b.progress.dueAt!).getTime())
+    .map((c) => ({ id: c.id, kind: "review" as const }));
+}
+
+/** Next round: the first `roundSize` session words that aren't done for today. */
+export function nextRoundIds(
+  items: SessionItem[],
+  progressOf: (id: string) => Progress,
+  opts: { today: string; stepsPerDay: number; roundSize: number },
+): string[] {
+  return items
+    .filter((it) => !doneToday(progressOf(it.id), it.kind, opts.today, opts.stepsPerDay))
+    .slice(0, opts.roundSize)
+    .map((it) => it.id);
 }
 
 /** Where to put a card that was answered wrong: 3–5 questions later. */
@@ -388,14 +513,14 @@ export function reinsertIndex(currentIndex: number, queueLength: number, rand: R
 /* Test generation                                                    */
 /* ------------------------------------------------------------------ */
 
-export type TestType = "mc" | "write" | "dictation" | "speak" | "true_false";
+export type TestType = "mc" | "write" | "dictation" | "true_false";
 
 export function buildTest(
   cards: StudyCard[],
-  opts: { count: number; types: TestType[]; speakAvailable: boolean },
+  opts: { count: number; types: TestType[] },
   rand: Rand,
 ): Question[] {
-  let types = opts.types.filter((t) => (t === "speak" ? opts.speakAvailable : true));
+  let types = opts.types.slice();
   if (!canUseMultipleChoice(cards.length)) types = types.filter((t) => t !== "mc");
   if (cards.length < 2) types = types.filter((t) => t !== "true_false");
   if (types.length === 0) types = ["write"];

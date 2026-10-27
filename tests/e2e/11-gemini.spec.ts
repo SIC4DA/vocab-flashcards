@@ -77,5 +77,5 @@ test("the in-app guide explains when a word is learned", async ({ page }) => {
   await page.goto("/settings");
   await page.getByRole("link", { name: /How the app works/ }).click();
   await expect(page).toHaveURL(/\/help$/);
-  await expect(page.getByText("at least 15 correct answers")).toBeVisible();
+  await expect(page.getByText("at least 12 correct answers")).toBeVisible();
 });

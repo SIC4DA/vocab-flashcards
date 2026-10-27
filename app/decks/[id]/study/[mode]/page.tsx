@@ -3,13 +3,12 @@ import { notFound } from "next/navigation";
 import { StudyLoader, type StudyMode } from "@/components/study/study-loader";
 import { loadDeckForPage } from "@/lib/page-data";
 
-const MODES: StudyMode[] = ["learn", "flashcards", "write", "listen", "speak", "match", "test"];
+const MODES: StudyMode[] = ["learn", "flashcards", "write", "listen", "match", "test"];
 const TITLES: Record<string, string> = {
   learn: "Learn",
   flashcards: "Flashcards",
   write: "Write",
   listen: "Listen",
-  speak: "Speak",
   match: "Match",
   test: "Test",
 };

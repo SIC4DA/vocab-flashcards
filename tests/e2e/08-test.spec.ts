@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 import { createDeckAPI, expect, registerAPI, setSettings, test, uid, WORDS } from "./helpers";
-import { setSpeech } from "./study-helpers";
 
 async function answerTest(page: Page, cards: { id: string; term: string; definition: string }[], wrongCount: number) {
   const questions = page.getByTestId("test-question");
@@ -13,7 +12,7 @@ async function answerTest(page: Page, cards: { id: string; term: string; definit
     types.push(type);
     const id = (await q.getAttribute("data-card-id"))!;
     const c = cards.find((x) => x.id === id)!;
-    const makeWrong = wrong < wrongCount && type !== "speak";
+    const makeWrong = wrong < wrongCount;
     if (makeWrong) wrong++;
     switch (type) {
       case "mc":
@@ -30,11 +29,6 @@ async function answerTest(page: Page, cards: { id: string; term: string; definit
       case "dictation":
         await q.getByTestId("test-input").fill(makeWrong ? "nope nope" : c.term);
         break;
-      case "speak":
-        await setSpeech(page, "answer", c.term);
-        await q.getByTestId("test-mic").click();
-        await expect(q).toContainText(`Heard: ${c.term}`);
-        break;
     }
   }
   return { types, wrong };
@@ -48,12 +42,12 @@ test("test mode with all question types, pass/fail, and retake missed", async ({
 
   await expect(page.getByTestId("test-options")).toBeVisible();
   await page.getByLabel(/Number of questions/).fill("6");
-  for (const t of ["mc", "write", "dictation", "speak", "true_false"]) await page.getByTestId(`test-type-${t}`).check();
+  for (const t of ["mc", "write", "dictation", "true_false"]) await page.getByTestId(`test-type-${t}`).check();
   await page.getByTestId("start-test").click();
   await expect(page.getByTestId("test-question")).toHaveCount(6);
 
   const { types, wrong } = await answerTest(page, cards, 2);
-  expect(new Set(types)).toEqual(new Set(["mc", "write", "dictation", "speak", "true_false"]));
+  expect(new Set(types)).toEqual(new Set(["mc", "write", "dictation", "true_false"]));
   await page.getByTestId("submit-test").click();
   await expect(page.getByTestId("test-results")).toBeVisible();
   await expect(page.getByTestId("test-score")).toHaveText(`${Math.round(((6 - wrong) / 6) * 100)}%`);

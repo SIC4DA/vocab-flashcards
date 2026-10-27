@@ -39,7 +39,7 @@ test("write mode: accent-insensitive answer and typo override with 'I was right'
     await page.keyboard.press("Enter");
   }
   expect(seen.size).toBe(WORDS.length);
-  await expect(page.getByTestId("session-done")).toContainText("6 of 6 correct");
+  await expect(page.getByTestId("session-done")).toContainText("6 of 6 answers correct");
 
   // Special characters bar inserts at the cursor
   await page.goto(`/decks/${deckId}/study/write`);

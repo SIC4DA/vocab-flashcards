@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { api, ApiClientError } from "@/lib/client/api";
 import type { CardDTO, DeckDTO } from "@/lib/data";
 import { getLanguage, langDir } from "@/lib/languages";
-import { NEW_PROGRESS, QUESTION_LABELS, STAGE_NAMES, stageBuckets, type QuestionType } from "@/lib/learn";
+import { deckTopics, NEW_PROGRESS, QUESTION_LABELS, STAGE_NAMES, stageBuckets, topicSummary, type QuestionType, type StudyCard } from "@/lib/learn";
 import { isDue } from "@/lib/srs";
 import { AudioButton } from "./audio";
 import { CardImage } from "./card-image";
@@ -15,11 +15,10 @@ import { useApp, useConfirm, useToast } from "./providers";
 import { EmptyState } from "./ui";
 
 export const MODES = [
-  { mode: "learn", icon: "🧠", label: "Learn", desc: "Adaptive: recognise → write → speak" },
+  { mode: "learn", icon: "🧠", label: "Learn", desc: "Your daily session" },
   { mode: "flashcards", icon: "🃏", label: "Flashcards", desc: "Flip and sort" },
   { mode: "write", icon: "✍️", label: "Write", desc: "Type every term" },
   { mode: "listen", icon: "🎧", label: "Listen", desc: "Dictation" },
-  { mode: "speak", icon: "🎤", label: "Speak", desc: "Say the word" },
   { mode: "match", icon: "🎯", label: "Match", desc: "Beat the clock" },
   { mode: "test", icon: "📝", label: "Test", desc: "Generated exam" },
 ] as const;
@@ -43,7 +42,7 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
   const router = useRouter();
   const toast = useToast();
   const confirm = useConfirm();
-  const { speakAvailable, speechSupported, speechFallback, settings, gemini } = useApp();
+  const { gemini } = useApp();
   const [organizing, setOrganizing] = useState<string | null>(null);
   const [cards, setCards] = useState(initialCards);
   const [busy, setBusy] = useState(false);
@@ -52,6 +51,13 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
 
   const buckets = useMemo(() => stageBuckets(cards), [cards]);
   const hasTopics = cards.some((c) => c.groupLabel);
+  const topics = useMemo(
+    () =>
+      topicSummary(
+        deckTopics(cards.map((c) => ({ id: c.id, group: c.groupLabel, progress: c.progress }) as unknown as StudyCard)),
+      ),
+    [cards],
+  );
   const dueCount = useMemo(() => cards.filter((c) => c.progress.stage >= 1 && isDue(c.progress.dueAt)).length, [cards]);
   const accuracy = useMemo(() => {
     const agg: Record<string, { correct: number; wrong: number }> = {};
@@ -62,7 +68,7 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
         agg[k].wrong += v.wrong;
       }
     return Object.entries(agg)
-      .filter(([, v]) => v.correct + v.wrong > 0)
+      .filter(([k, v]) => v.correct + v.wrong > 0 && k in MODE_STAT_LABELS)
       .sort((a, b) => b[1].correct + b[1].wrong - (a[1].correct + a[1].wrong));
   }, [cards]);
 
@@ -131,13 +137,6 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
     toast.show("Card progress reset");
   }
 
-  const speakDisabledReason =
-    speechSupported === false && !speechFallback
-      ? "Speech recognition isn't supported in this browser (try Chrome, Edge or Safari)."
-      : !settings.enableSpeaking
-        ? "Speaking questions are turned off in Settings."
-        : null;
-
   return (
     <div className="space-y-6">
       <section>
@@ -194,41 +193,75 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
         <>
           <section aria-label="Study modes">
             <h2 className="sr-only">Study modes</h2>
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               {MODES.map((m) => {
-                const disabled = m.mode === "speak" && !speakAvailable;
-                const reason = m.mode === "speak" ? speakDisabledReason : null;
                 const inner = (
                   <>
                     <span aria-hidden className="text-2xl">
                       {m.icon}
                     </span>
                     <span className="font-bold">{m.label}</span>
-                    <span className="text-xs text-muted">{disabled && reason ? "Unavailable" : m.desc}</span>
+                    <span className={`text-xs ${m.mode === "learn" ? "opacity-90" : "text-muted"}`}>{m.desc}</span>
                   </>
                 );
                 const cls =
                   "panel flex min-h-28 flex-col items-center justify-center gap-1 p-3 text-center transition-transform";
                 return (
-                  <li key={m.mode}>
-                    {disabled ? (
-                      <span className={`${cls} cursor-not-allowed opacity-60`} title={reason ?? undefined} aria-disabled="true">
-                        {inner}
-                        <span className="sr-only">{reason}</span>
-                      </span>
-                    ) : (
-                      <Link
-                        href={`/decks/${deck.id}/study/${m.mode}`}
-                        className={`${cls} hover:-translate-y-0.5 hover:border-accent`}
-                        data-testid={`mode-${m.mode}`}
-                      >
-                        {inner}
-                      </Link>
-                    )}
+                  <li key={m.mode} className={m.mode === "learn" ? "col-span-2 sm:col-span-1" : undefined}>
+                    <Link
+                      href={`/decks/${deck.id}/study/${m.mode}`}
+                      className={`${cls} hover:-translate-y-0.5 hover:border-accent ${
+                        m.mode === "learn" ? "border-accent bg-accent text-on-accent hover:bg-accent-strong" : ""
+                      }`}
+                      data-testid={`mode-${m.mode}`}
+                    >
+                      {inner}
+                    </Link>
                   </li>
                 );
               })}
             </ul>
+          </section>
+
+          <section className="panel p-5" aria-labelledby="topics-h" data-testid="topics-panel">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="topics-h" className="font-bold">
+                {hasTopics ? "Topics" : "Sets"}
+              </h2>
+              <p className="text-xs text-muted">
+                Learn teaches one {hasTopics ? "topic" : "set"} at a time. The next one starts when 3 of every 4 words
+                can be written.{" "}
+                <Link href="/help#learned" className="font-semibold text-accent hover:underline">
+                  How it works
+                </Link>
+              </p>
+            </div>
+            <ol className="mt-3 grid gap-2 sm:grid-cols-2">
+              {topics.map((t, i) => (
+                <li
+                  key={t.key}
+                  className={`rounded-xl border p-3 ${t.current ? "border-accent bg-accent-soft" : "border-line"}`}
+                  data-testid="topic-row"
+                  data-current={t.current}
+                >
+                  <div className="flex items-center justify-between gap-2 text-sm">
+                    <span className="font-semibold">
+                      {i + 1}. {t.label}
+                    </span>
+                    <span className={`text-xs font-bold ${t.finished ? "text-success" : t.current ? "text-accent" : "text-muted"}`}>
+                      {t.mastered === t.total ? "✓ Mastered" : t.finished ? "✓ Done" : t.current ? "Learning now" : t.new === t.total ? "Up next" : "In progress"}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+                    <div className="bg-success" style={{ width: `${(t.mastered / t.total) * 100}%` }} />
+                    <div className="bg-warning" style={{ width: `${((t.written - t.mastered) / t.total) * 100}%` }} />
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    {t.mastered}/{t.total} mastered · {t.written - t.mastered} written · {t.new} new
+                  </p>
+                </li>
+              ))}
+            </ol>
           </section>
 
           <section className="grid gap-4 md:grid-cols-[2fr_1fr]" aria-label="Progress">

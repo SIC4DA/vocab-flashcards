@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { scoreRecordingFile, titleVariants } from "@/lib/recording-match";
 import { lookupCandidates } from "@/lib/pronounce";
 import { looksUnpicturable } from "@/lib/auto-image";
-import { anchorGroup, NEW_PROGRESS, selectRound, type Progress, type StudyCard } from "@/lib/learn";
+import { currentTopic, deckTopics, NEW_PROGRESS, planLearnSession, topicFinished, topicSummary, type Progress, type StudyCard } from "@/lib/learn";
 import { geminiKeySchema } from "@/lib/validation";
 import { pickVoice, voiceQuality } from "@/lib/tts";
 
@@ -65,8 +65,9 @@ describe("Gemini key formats", () => {
   });
 });
 
-describe("topic grouping in Learn", () => {
+describe("topics in Learn", () => {
   const now = new Date("2026-03-01T10:00:00Z");
+  const today = "2026-03-01";
   const card = (i: number, group: string | null, progress: Partial<Progress> = {}): StudyCard => ({
     id: `c${i}`,
     deckId: "d",
@@ -80,18 +81,46 @@ describe("topic grouping in Learn", () => {
     definitionLang: "en-US",
     progress: { ...NEW_PROGRESS, ...progress },
   });
-  it("introduces new words topic by topic", () => {
+  const newIds = (cards: StudyCard[], newAllowed = 10) =>
+    planLearnSession(cards, { now, today, newAllowed, stepsPerDay: 2 }).items.filter((i) => i.kind === "new").map((i) => i.id);
+
+  it("uses AI topics in order of first appearance, new words only from the current topic", () => {
     const cards = [card(1, "Food"), card(2, "Animals"), card(3, "Food"), card(4, "Animals"), card(5, "Food")];
-    expect(selectRound(cards, { now, newAllowed: 3, roundSize: 7 }).map((c) => c.id)).toEqual(["c1", "c3", "c5"]);
+    expect(deckTopics(cards).map((t) => t.label)).toEqual(["Food", "Animals"]);
+    expect(newIds(cards)).toEqual(["c1", "c3", "c5"]);
   });
-  it("continues the topic already being learned", () => {
-    const future = "2026-03-05T00:00:00Z";
-    const cards = [card(1, "Food"), card(2, "Animals", { stage: 2, dueAt: future }), card(3, "Animals"), card(4, "Food")];
-    expect(anchorGroup([cards[1]], [cards[0], cards[2], cards[3]])).toBe("Animals");
-    expect(selectRound(cards, { now, newAllowed: 1, roundSize: 7 }).map((c) => c.id)).toEqual(["c2", "c3"]);
+
+  it("without AI topics, splits the deck into sets of 8 in deck order", () => {
+    const cards = Array.from({ length: 20 }, (_, i) => card(i, null));
+    expect(deckTopics(cards).map((t) => [t.label, t.cards.length])).toEqual([
+      ["Set 1", 8],
+      ["Set 2", 8],
+      ["Set 3", 4],
+    ]);
+    expect(newIds(cards)).toEqual(["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7"]);
   });
-  it("keeps deck order without topics", () => {
-    const cards = [card(1, null), card(2, null), card(3, null)];
-    expect(selectRound(cards, { now, newAllowed: 2, roundSize: 7 }).map((c) => c.id)).toEqual(["c1", "c2"]);
+
+  it("starts the next topic once 3 of 4 words in the current one can be written", () => {
+    const food = [0, 1, 2, 3].map((i) => card(i, "Food", { stage: 4 }));
+    const animals = [4, 5].map((i) => card(i, "Animals"));
+    // all 4 written → finished
+    expect(currentTopic(deckTopics([...food, ...animals]))?.label).toBe("Animals");
+    // one hard word still at stage 2: 3/4 written → still finished, it keeps being practised
+    food[3] = card(3, "Food", { stage: 2 });
+    expect(currentTopic(deckTopics([...food, ...animals]))?.label).toBe("Animals");
+    // two words not written yet → Food continues, no Animals words yet
+    food[2] = card(2, "Food", { stage: 3 });
+    expect(currentTopic(deckTopics([...food, ...animals]))?.label).toBe("Food");
+    expect(newIds([...food, ...animals])).toEqual([]);
+    // a word of the topic not even seen yet → topic not finished
+    expect(topicFinished({ key: "x", label: "x", cards: [card(9, "x", { stage: 6 }), card(10, "x")] })).toBe(false);
+  });
+
+  it("summarises topic progress for the deck page", () => {
+    const cards = [card(1, "Food", { stage: 6 }), card(2, "Food", { stage: 4 }), card(3, "Animals")];
+    expect(topicSummary(deckTopics(cards))).toEqual([
+      expect.objectContaining({ label: "Food", total: 2, mastered: 1, written: 2, new: 0, finished: true, current: false }),
+      expect.objectContaining({ label: "Animals", total: 1, new: 1, finished: false, current: true }),
+    ]);
   });
 });

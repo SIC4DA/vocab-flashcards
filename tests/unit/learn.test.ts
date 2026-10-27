@@ -11,7 +11,9 @@ import {
   questionTypeForStage,
   reinsertIndex,
   reviewQuestionType,
-  selectRound,
+  doneToday,
+  nextRoundIds,
+  planLearnSession,
   type Progress,
   type StudyCard,
 } from "@/lib/learn";
@@ -21,7 +23,7 @@ const seq = (...values: number[]) => {
   return () => values[i++ % values.length];
 };
 const rand = seq(0.1, 0.7, 0.3, 0.9, 0.5);
-const opts = { advanceAfter: 2, speakAvailable: true };
+const opts = { advanceAfter: 2 };
 const at = (stage: number, extra: Partial<Progress> = {}): Progress => ({ ...NEW_PROGRESS, stage, ...extra });
 const now = new Date("2026-03-01T10:00:00Z");
 
@@ -84,17 +86,18 @@ describe("ladder", () => {
     expect(r.progress.intervalDays).toBe(1);
   });
 
-  it("skips Speak (stage 5) when speech isn't available: 4 → 6", () => {
+  it("goes from Written (4) straight to Mastered (6) — there is no speaking stage", () => {
     let p = at(4);
-    const noSpeak = { advanceAfter: 2, speakAvailable: false };
-    p = applyAnswer(p, { correct: true, type: "write", ladder: true }, noSpeak, now).progress;
-    p = applyAnswer(p, { correct: true, type: "write", ladder: true }, noSpeak, now).progress;
+    p = applyAnswer(p, { correct: true, type: "write", ladder: true }, opts, now).progress;
+    expect(p.stage).toBe(4);
+    p = applyAnswer(p, { correct: true, type: "write", ladder: true }, opts, now).progress;
     expect(p.stage).toBe(6);
-    expect(applyAnswer(at(4, { correctStreak: 1 }), { correct: true, type: "write", ladder: true }, opts, now).progress.stage).toBe(5);
+    // Legacy stage-5 cards also graduate after writing
+    expect(applyAnswer(at(5, { correctStreak: 1 }), { correct: true, type: "write", ladder: true }, opts, now).progress.stage).toBe(6);
   });
 
   it("graduating to mastered starts SM-2 with a 1-day interval", () => {
-    const r = applyAnswer(at(5, { correctStreak: 1 }), { correct: true, type: "speak", ladder: true }, opts, now);
+    const r = applyAnswer(at(4, { correctStreak: 1 }), { correct: true, type: "write", ladder: true }, opts, now);
     expect(r.progress.stage).toBe(6);
     expect(r.progress.reps).toBe(0);
     expect(new Date(r.progress.dueAt!).getTime() - now.getTime()).toBe(86_400_000);
@@ -120,7 +123,7 @@ describe("ladder", () => {
 });
 
 describe("question type selection", () => {
-  const o = { speakAvailable: true, deckSize: 10, rand };
+  const o = { deckSize: 10, rand };
   it("follows the ladder order", () => {
     expect(questionTypeForStage(0, 0, o)).toBe("flashcard");
     expect(questionTypeForStage(1, 0, o)).toBe("mc");
@@ -128,10 +131,7 @@ describe("question type selection", () => {
     expect(questionTypeForStage(2, 1, o)).toBe("mc_reverse");
     expect(questionTypeForStage(3, 0, o)).toBe("dictation");
     expect(questionTypeForStage(4, 0, o)).toBe("write");
-    expect(questionTypeForStage(5, 0, o)).toBe("speak");
-  });
-  it("uses Write at stage 5 when speaking is unavailable", () => {
-    expect(questionTypeForStage(5, 0, { ...o, speakAvailable: false })).toBe("write");
+    expect(questionTypeForStage(5, 0, o)).toBe("write"); // legacy stage
   });
   it("small decks (≤ 2 cards) skip multiple choice", () => {
     const small = { ...o, deckSize: 2 };
@@ -141,11 +141,11 @@ describe("question type selection", () => {
     expect(questionTypeForStage(0, 0, small)).toBe("flashcard");
   });
   it("review types are weighted towards production", () => {
-    expect(reviewQuestionType(() => 0.0, true, 10)).toBe("write"); // 0–40
-    expect(reviewQuestionType(() => 0.5, true, 10)).toBe("speak"); // 40–70
-    expect(reviewQuestionType(() => 0.8, true, 10)).toBe("dictation"); // 70–90
-    expect(reviewQuestionType(() => 0.95, true, 10)).toBe("mc"); // 90–100
-    for (let r = 0; r < 1; r += 0.05) expect(reviewQuestionType(() => r, false, 10)).not.toBe("speak");
+    expect(reviewQuestionType(() => 0.0, 10)).toBe("write"); // 0–60
+    expect(reviewQuestionType(() => 0.59, 10)).toBe("write");
+    expect(reviewQuestionType(() => 0.7, 10)).toBe("dictation"); // 60–85
+    expect(reviewQuestionType(() => 0.9, 10)).toBe("mc"); // 85–100
+    for (let r = 0; r < 1; r += 0.05) expect(reviewQuestionType(() => r, 2)).not.toBe("mc");
   });
 });
 
@@ -190,24 +190,97 @@ describe("distractors", () => {
   });
 });
 
-describe("session selection", () => {
-  it("orders due → in progress → new (limited)", () => {
+describe("daily Learn session", () => {
+  const today = "2026-03-01";
+  const plan = (cards: StudyCard[], newAllowed = 10, stepsPerDay = 2) =>
+    planLearnSession(cards, { now, today, newAllowed, stepsPerDay });
+
+  it("orders reviews → words in progress → new words (limited)", () => {
     const due = card(1, at(6, { dueAt: "2026-02-01T00:00:00Z" }));
     const notDueMastered = card(2, at(6, { dueAt: "2026-04-01T00:00:00Z" }));
     const learning = card(3, at(2, { dueAt: "2026-04-01T00:00:00Z" }));
-    const new1 = card(4);
-    const new2 = card(5);
-    const round = selectRound([new1, learning, notDueMastered, due, new2], { now, newAllowed: 1, roundSize: 7 });
-    expect(round.map((c) => c.id)).toEqual(["c1", "c3", "c4"]);
+    const p = plan([card(4), learning, notDueMastered, due, card(5)], 1);
+    expect(p.items).toEqual([
+      { id: "c1", kind: "review" },
+      { id: "c3", kind: "learning" },
+      { id: "c4", kind: "new" },
+    ]);
   });
-  it("respects the round size", () => {
+
+  it("rounds take the first words that still have work today", () => {
     const cards = Array.from({ length: 12 }, (_, i) => card(i));
-    expect(selectRound(cards, { now, newAllowed: 10, roundSize: 7 })).toHaveLength(7);
+    const p = plan(cards, 10);
+    expect(p.items).toHaveLength(8); // only the first set of 8 (one topic at a time)
+    const ids = nextRoundIds(p.items, (id) => cards.find((c) => c.id === id)!.progress, { today, stepsPerDay: 2, roundSize: 7 });
+    expect(ids).toHaveLength(7);
   });
+
   it("is empty when everything is mastered and not due", () => {
-    const cards = [card(1, at(6, { dueAt: "2026-05-01T00:00:00Z" }))];
-    expect(selectRound(cards, { now, newAllowed: 10, roundSize: 7 })).toHaveLength(0);
+    expect(plan([card(1, at(6, { dueAt: "2026-05-01T00:00:00Z" }))]).items).toHaveLength(0);
   });
+
+  it("a word is done for today after climbing stepsPerDay steps", () => {
+    let p = applyView(NEW_PROGRESS, now, today).progress; // free: New → Seen
+    expect(doneToday(p, "new", today, 2)).toBe(false);
+    p = applyAnswer(p, { correct: true, type: "mc", ladder: true }, { advanceAfter: 1, today }, now).progress;
+    expect(p.stage).toBe(2);
+    expect(doneToday(p, "new", today, 2)).toBe(false);
+    p = applyAnswer(p, { correct: true, type: "listen_mc", ladder: true }, { advanceAfter: 1, today }, now).progress;
+    expect(p.stage).toBe(3);
+    expect(doneToday(p, "new", today, 2)).toBe(true);
+    // Next day the allowance is fresh
+    expect(doneToday(p, "learning", "2026-03-02", 2)).toBe(false);
+  });
+
+  it("mistakes don't use up the day's steps, but 3 mistakes end the word's day", () => {
+    let p = at(3, { dayKey: today, dayStartStage: 3 });
+    p = applyAnswer(p, { correct: false, type: "dictation", ladder: true }, { advanceAfter: 1, today }, now).progress;
+    expect(p.stage).toBe(2);
+    expect(doneToday(p, "learning", today, 2)).toBe(false);
+    p = applyAnswer(p, { correct: false, type: "mc_reverse", ladder: true }, { advanceAfter: 1, today }, now).progress;
+    p = applyAnswer(p, { correct: false, type: "mc_reverse", ladder: true }, { advanceAfter: 1, today }, now).progress;
+    expect(p.dayWrong).toBe(3);
+    expect(doneToday(p, "learning", today, 2)).toBe(true);
+  });
+
+  it("reviews are done after one correct answer", () => {
+    const p = applyAnswer(at(6, { reps: 2, intervalDays: 6 }), { correct: true, type: "write", ladder: true }, { advanceAfter: 1, today }, now).progress;
+    expect(doneToday(p, "review", today, 2)).toBe(true);
+  });
+
+  it("words that already used today's steps aren't planned again today", () => {
+    const busy = card(1, at(3, { dayKey: today, dayStartStage: 1 }));
+    const fresh = card(2, at(2, { dayKey: "2026-02-28", dayStartStage: 1 }));
+    expect(plan([busy, fresh]).items.map((i) => i.id)).toEqual(["c2"]);
+  });
+
+  it("never becomes endless: 10 new words, 75% accuracy → a short, finite session", () => {
+    let seed = 3;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const cards = Array.from({ length: 10 }, (_, i) => card(i));
+    const p = plan(cards, 10);
+    const byId = new Map(cards.map((c) => [c.id, c]));
+    let questions = 0;
+    const per = new Map<string, number>();
+    for (let round = 0; round < 100; round++) {
+      const ids = nextRoundIds(p.items, (id) => byId.get(id)!.progress, { today, stepsPerDay: 2, roundSize: 7 });
+      if (!ids.length) break;
+      const queue = ids.map((id) => byId.get(id)!);
+      while (queue.length) {
+        const c = queue.shift()!;
+        const type = questionTypeForStage(c.progress.stage, c.progress.correctStreak, { deckSize: 10, rand: rnd });
+        const correct = type === "flashcard" || rnd() < 0.75;
+        c.progress = applyAnswer(c.progress, { correct, type, ladder: true }, { advanceAfter: 1, today }, now).progress;
+        questions++;
+        per.set(c.id, (per.get(c.id) ?? 0) + 1);
+        if (!correct && !doneToday(c.progress, "new", today, 2)) queue.splice(3, 0, c);
+      }
+    }
+    expect(questions).toBeLessThanOrEqual(60);
+    expect(Math.max(...per.values())).toBeLessThanOrEqual(6);
+    expect(p.items.every((it) => doneToday(byId.get(it.id)!.progress, it.kind, today, 2))).toBe(true);
+  });
+
   it("wrong answers come back 3–5 questions later", () => {
     for (const r of [0, 0.5, 0.99]) {
       const idx = reinsertIndex(2, 20, () => r);
@@ -221,14 +294,13 @@ describe("session selection", () => {
 describe("test generation", () => {
   const cards = Array.from({ length: 8 }, (_, i) => card(i));
   it("builds the requested number of questions with the requested types", () => {
-    const qs = buildTest(cards, { count: 5, types: ["mc", "write", "true_false"], speakAvailable: true }, rand);
+    const qs = buildTest(cards, { count: 5, types: ["mc", "write", "true_false"] }, rand);
     expect(qs).toHaveLength(5);
     expect(new Set(qs.map((q) => q.cardId)).size).toBe(5);
     for (const q of qs) expect(["mc", "write", "true_false"]).toContain(q.type);
   });
-  it("drops speak when unavailable and mc for tiny decks", () => {
-    expect(buildTest(cards, { count: 4, types: ["speak"], speakAvailable: false }, rand).every((q) => q.type === "write")).toBe(true);
+  it("drops multiple choice for tiny decks", () => {
     const two = cards.slice(0, 2);
-    expect(buildTest(two, { count: 2, types: ["mc"], speakAvailable: true }, rand).every((q) => q.type === "write")).toBe(true);
+    expect(buildTest(two, { count: 2, types: ["mc"] }, rand).every((q) => q.type === "write")).toBe(true);
   });
 });

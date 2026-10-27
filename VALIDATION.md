@@ -10,8 +10,8 @@ Command: `npm run lint && npm run typecheck && npm test && npm run test:e2e && n
 |---|---|
 | `npm run lint` | ✅ 0 errors, 0 warnings (`--max-warnings=0`) |
 | `npm run typecheck` | ✅ `next typegen && tsc --noEmit`, strict mode, no errors |
-| `npm test` (Vitest) | ✅ **136 tests in 13 files** passed (unit + integration on in-memory PGlite, no network) |
-| `npm run test:e2e` (Playwright) | ✅ **36 tests** passed (18 scenarios × desktop 1280 px and mobile Pixel 7 viewports, Chromium, production build) |
+| `npm test` (Vitest) | ✅ **134 tests in 12 files** passed (unit + integration on in-memory PGlite, no network) |
+| `npm run test:e2e` (Playwright) | ✅ **38 tests** passed (19 scenarios × desktop 1280 px and mobile Pixel 7 viewports, Chromium, production build) |
 | `npm run build` | ✅ migrations step (skipped without `DATABASE_URL`) + `next build`, no warnings |
 
 ### Unit tests (`tests/unit`)
@@ -62,6 +62,17 @@ External HTTP APIs are mocked by a local mock server (server-side calls) and `pa
 - In the in-app browser, pressing 🔊 for *der Hund* played `De-Hund.ogg.mp3` from upload.wikimedia.org under the production CSP.
 - `AQ.`-format keys: accepted by validation, verified via `countTokens`, used for requests (unit + integration + E2E with a mocked Google).
 - Not verified: a real `AQ.` key against Google (none available), and Gemini's real decisions about which words need pictures and how it groups them (tested with mocked responses).
+
+### Update: speaking removed
+
+Speaking practice was removed at the owner's request (see DECISIONS.md #68–71), so the original §14 items about Speak mode, speech matching and the microphone no longer apply; their tests were removed. A new E2E test checks that the Speak mode tile is gone, `/decks/:id/study/speak` returns 404, and Settings has no speaking options. The Learn E2E test now checks the order flashcard → MC → listening → dictation → write → Mastered.
+
+### Update: Learn algorithm validated and redesigned
+
+- **Simulation of the old Learn** (10 new words, default settings): 112 questions in one session at 90% accuracy, 299 at 75%, one word asked up to 54 times. This confirmed the "endless" report.
+- **Simulation of the new daily Learn** (40-word deck, 14 days): 27 questions/day on average at 90% accuracy (longest day 43), 37 at 75% (longest 61); at most 6 times per word per day; a new topic about every 2 days; all words mastered by day 10 at 90% accuracy.
+- Unit tests cover session planning order, daily step limits, the free first view, mistakes not consuming steps, the 3-mistake cap, reviews done after one correct answer, words excluded once their day is done, topics (AI labels, sets of 8, 75% rule, summary), and an "it never becomes endless" regression bound (≤ 60 questions, ≤ 6 per word for 10 new words at 75%).
+- E2E: with default settings, a 4-word deck takes exactly 12 questions (each word: see → multiple choice → listening), ends with "Done for today!", shows the stats, and "Keep going anyway" continues with dictation; the deck page shows the set as "Learning now". The full-ladder test (5 steps/day) still follows one word to Mastered and checks wrong answers return 3–5 questions later.
 
 ## 14.2 Manual checklist
 

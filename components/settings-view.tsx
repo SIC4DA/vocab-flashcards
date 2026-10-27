@@ -128,7 +128,7 @@ function GeminiKeySection() {
       <p className="text-sm text-muted">
         The app works fully without AI. If you add your own free <b>Google Gemini API key</b>, you also get: better
         definition suggestions with an example sentence, smarter image search for non-English definitions, a cloud voice
-        when your device has no voice for a language, speech recognition in browsers that lack it (like Firefox), and
+        for words without a native recording, and
         <b> ✨ Generate deck</b> from a topic.
       </p>
       <details className="rounded-xl bg-surface-2 p-3 text-sm">
@@ -188,7 +188,7 @@ function GeminiKeySection() {
 }
 
 export function SettingsView() {
-  const { settings, updateSettings, gemini, speechSupported, speechFallback } = useApp();
+  const { settings, updateSettings, gemini } = useApp();
   const toast = useToast();
   const confirm = useConfirm();
   const router = useRouter();
@@ -292,18 +292,27 @@ export function SettingsView() {
         <h2 id="study-h" className="py-4 text-lg font-bold">
           Studying
         </h2>
-        <Toggle id="s-speak" label="Enable speaking questions" checked={settings.enableSpeaking} onChange={(v) => save({ enableSpeaking: v })} />
-        <p className="py-3 text-sm text-muted" data-testid="speech-support-note">
-          {speechSupported === false
-            ? speechFallback
-              ? "Your browser has no built-in speech recognition; recordings are transcribed with Gemini instead."
-              : "⚠️ Your browser doesn't support speech recognition (Firefox doesn't). Speaking questions are skipped. Use Chrome, Edge or Safari to practise speaking."
-            : "Speech recognition works in Chrome, Edge and Safari. Firefox doesn't support it."}
-        </p>
         <Toggle id="s-strict" label="Strict accents" hint="Answers with wrong accents count as incorrect" checked={settings.strictAccents} onChange={(v) => save({ strictAccents: v })} />
         <Toggle id="s-articles" label="Ignore articles" hint="“la casa” = “casa”" checked={settings.ignoreArticles} onChange={(v) => save({ ignoreArticles: v })} />
-        <NumberField id="s-advance" label="Correct answers to advance a stage" value={settings.advanceAfter} min={1} max={3} onChange={(v) => save({ advanceAfter: v })} />
-        <NumberField id="s-new" label="New cards per day" value={settings.newPerDay} min={1} max={100} onChange={(v) => save({ newPerDay: v })} />
+        <NumberField
+          id="s-advance"
+          label="Correct answers to move up a step"
+          hint="1 is recommended; daily repetition does the rest"
+          value={settings.advanceAfter}
+          min={1}
+          max={3}
+          onChange={(v) => save({ advanceAfter: v })}
+        />
+        <NumberField
+          id="s-steps"
+          label="Steps per word per day"
+          hint="How far one word can climb in a day's Learn session (2 recommended)"
+          value={settings.stepsPerDay}
+          min={1}
+          max={5}
+          onChange={(v) => save({ stepsPerDay: v })}
+        />
+        <NumberField id="s-new" label="New words per day" value={settings.newPerDay} min={1} max={100} onChange={(v) => save({ newPerDay: v })} />
         <NumberField id="s-round" label="Learn round size" value={settings.roundSize} min={5} max={15} onChange={(v) => save({ roundSize: v })} />
         <NumberField id="s-pass" label="Test pass mark (%)" value={settings.passMark} min={50} max={100} onChange={(v) => save({ passMark: v })} />
       </section>

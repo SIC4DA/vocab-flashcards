@@ -187,12 +187,16 @@ describe("review", () => {
       cookie: a.cookie,
       body: { cardId, mode: "learn", questionType: "listen_mc", correct: false, grade: 1, answerGiven: "x", responseMs: 900 },
     });
-    expect(wrong.json.progress.stage).toBe(1);
+    // 1 correct answer per step (default): view → 1, mc → 2, mc → 3, wrong → back to 2
+    expect(wrong.json.progress.stage).toBe(2);
+    expect(wrong.json.progress.dayWrong).toBe(1);
+    expect(wrong.json.progress.dayKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(wrong.json.progress.lapses).toBe(1);
 
     const db = await getDb();
     const [p] = await db.select().from(schema.cardProgress).where(eq(schema.cardProgress.cardId, cardId));
-    expect(p.stage).toBe(1);
+    expect(p.stage).toBe(2);
+    expect(p.dayWrong).toBe(1);
     expect(p.modeStats).toMatchObject({ mc: { correct: 2, wrong: 0 }, listen_mc: { correct: 0, wrong: 1 } });
     const logs = await db.select().from(schema.reviewLog).where(eq(schema.reviewLog.cardId, cardId));
     expect(logs).toHaveLength(4);
@@ -209,7 +213,7 @@ describe("review", () => {
     const a = await registerUser("queuer");
     const { deckId, cards } = await createDeck(a.cookie, WORDS);
     await call(review.POST, { cookie: a.cookie, body: { cardId: cards[0].id, mode: "learn", questionType: "flashcard", correct: true } });
-    const q = await call(queue.GET, { cookie: a.cookie, url: `/api/study/queue?deckId=${deckId}&mode=learn&speak=0` });
+    const q = await call(queue.GET, { cookie: a.cookie, url: `/api/study/queue?deckId=${deckId}&mode=learn` });
     expect(q.status).toBe(200);
     const first = q.json.questions[0];
     expect(first).toMatchObject({ cardId: cards[0].id, type: "mc", answer: "apple" });

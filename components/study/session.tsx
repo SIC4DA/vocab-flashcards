@@ -3,43 +3,55 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "@/lib/client/api";
+import { api, tzOffset } from "@/lib/client/api";
 import { isTypingTarget } from "@/lib/client/keys";
 import { playCelebration, playFeedback } from "@/lib/client/sounds";
 import {
   applyAnswer,
   buildQuestion,
-  isCardDue,
+  deckTopics,
+  doneToday,
+  MAX_STAGE,
+  nextRoundIds,
   questionTypeForStage,
   reinsertIndex,
-  selectRound,
   STAGE_NAMES,
+  topicSummary,
+  type SessionKind,
   type Progress,
   type Question,
   type QuestionType,
   type StudyCard,
 } from "@/lib/learn";
 import { prefetchPronunciation, stopSpeaking } from "@/lib/tts";
-import { useApp, useConfirm, useToast } from "../providers";
+import { useApp, useConfirm } from "../providers";
 import { Confetti, ProgressBar } from "../ui";
 import {
   Feedback,
   MultipleChoiceQuestion,
   NewCardQuestion,
-  SpeakQuestion,
   WriteQuestion,
   type Outcome,
 } from "./questions";
+
+export type LearnSession = {
+  items: { id: string; kind: SessionKind }[];
+  today: string;
+  stepsPerDay: number;
+  topic: string | null;
+  topics: ReturnType<typeof topicSummary> | null;
+  bonus: number;
+};
 
 export type QueuePayload = {
   mode: string;
   cards: StudyCard[];
   questions: Question[];
   newAllowed: number;
-  speakAvailable: boolean;
+  session?: LearnSession | null;
 };
 
-type Mode = "learn" | "review" | "write" | "listen" | "speak";
+type Mode = "learn" | "review" | "write" | "listen";
 type LogEntry = { cardId: string; correct: boolean; before: number; after: number };
 
 export type ReviewBody = {
@@ -50,15 +62,15 @@ export type ReviewBody = {
   grade?: number;
   answerGiven: string;
   responseMs: number;
-  speakAvailable?: boolean;
   known?: boolean;
+  tz?: number;
 };
 
 /** One API call per answer; retried once so closing the tab loses nothing already answered. */
 export async function postReview(body: ReviewBody): Promise<{ progress: Progress } | null> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await api<{ progress: Progress }>("/api/review", { body });
+      return await api<{ progress: Progress }>("/api/review", { body: { tz: tzOffset(), ...body } });
     } catch {
       // retry once
     }
@@ -102,29 +114,34 @@ export function StudySession({
   payload,
   title,
   exitHref,
+  onKeepGoing,
 }: {
   mode: Mode;
   payload: QueuePayload;
   title: string;
   exitHref: string;
+  /** Start another (bonus) session after today's is done. */
+  onKeepGoing?: () => void;
 }) {
-  const { settings, speakAvailable: speakSupported } = useApp();
-  const toast = useToast();
+  const { settings } = useApp();
   const adaptive = mode === "learn" || mode === "review";
+  const session = payload.session ?? null;
+  const kindOf = useMemo(() => new Map((session?.items ?? []).map((it) => [it.id, it.kind])), [session]);
+  const [startStages] = useState(() => new Map(payload.cards.map((c) => [c.id, c.progress.stage])));
+  const isDone = useCallback(
+    (c: StudyCard) =>
+      session ? doneToday(c.progress, kindOf.get(c.id) ?? "learning", session.today, session.stepsPerDay) : false,
+    [session, kindOf],
+  );
   const [cards, setCards] = useState<Record<string, StudyCard>>(() =>
     Object.fromEntries(payload.cards.map((c) => [c.id, c])),
   );
-  const [speakOff, setSpeakOff] = useState(!speakSupported || !payload.speakAvailable);
-  const speakAvailable = !speakOff;
-  const [queue, setQueue] = useState<Question[]>(() =>
-    payload.questions.map((q) => (q.type === "speak" && !speakSupported ? { ...q, type: "write" as const } : q)),
-  );
+  const [queue, setQueue] = useState<Question[]>(payload.questions);
   const [pos, setPos] = useState(0);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [phase, setPhase] = useState<"question" | "summary" | "done">(payload.questions.length ? "question" : "done");
   const [roundLog, setRoundLog] = useState<LogEntry[]>([]);
   const [totals, setTotals] = useState({ correct: 0, wrong: 0 });
-  const [introduced, setIntroduced] = useState(0);
   const [announce, setAnnounce] = useState("");
   const [overridable, setOverridable] = useState(false);
   const pending = useRef<{ body: ReviewBody; before: Progress; reinsertedKey?: string } | null>(null);
@@ -154,16 +171,14 @@ export function StudySession({
   const typeFor = useCallback(
     (c: StudyCard, p: Progress): QuestionType => {
       if (!adaptive) {
-        const fixed: QuestionType = mode === "listen" ? "dictation" : mode === "speak" && speakAvailable ? "speak" : "write";
-        return fixed;
+        return mode === "listen" ? "dictation" : "write";
       }
       return questionTypeForStage(mode === "review" ? Math.max(1, p.stage) : p.stage, p.correctStreak, {
-        speakAvailable,
         deckSize: peersByDeck.get(c.deckId)?.length ?? 1,
         rand: Math.random,
       });
     },
-    [adaptive, mode, speakAvailable, peersByDeck],
+    [adaptive, mode, peersByDeck],
   );
 
   const commit = useCallback(
@@ -182,10 +197,9 @@ export function StudySession({
     const { progress } = applyAnswer(
       before,
       { correct: o.correct, grade: o.grade, type: current.type, ladder: adaptive, responseMs },
-      { advanceAfter: settings.advanceAfter, speakAvailable },
+      { advanceAfter: settings.advanceAfter, today: session?.today },
     );
     setCards((cs) => ({ ...cs, [card.id]: { ...card, progress } }));
-    if (before.stage === 0 && adaptive) setIntroduced((n) => n + 1);
     const body: ReviewBody = {
       cardId: card.id,
       mode,
@@ -194,7 +208,6 @@ export function StudySession({
       grade: o.grade,
       answerGiven: o.answerGiven,
       responseMs,
-      speakAvailable,
     };
 
     if (current.type === "flashcard") {
@@ -205,7 +218,8 @@ export function StudySession({
     }
 
     let reinsertedKey: string | undefined;
-    if (!o.correct) {
+    // A missed word comes back later in the round — unless it has had enough for today.
+    if (!o.correct && !isDone({ ...card, progress })) {
       const updated = { ...card, progress };
       const again = buildQuestion(updated, typeFor(updated, progress), peersByDeck.get(card.deckId) ?? [updated], Math.random);
       reinsertedKey = again.key;
@@ -237,7 +251,7 @@ export function StudySession({
     const { progress } = applyAnswer(
       p.before,
       { correct: true, grade: 3, type: current.type, ladder: adaptive },
-      { advanceAfter: settings.advanceAfter, speakAvailable },
+      { advanceAfter: settings.advanceAfter, today: session?.today },
     );
     setCards((cs) => ({ ...cs, [card.id]: { ...card, progress } }));
     if (p.reinsertedKey) setQueue((qs) => qs.filter((q) => q.key !== p.reinsertedKey));
@@ -264,47 +278,27 @@ export function StudySession({
   }
 
   function nextRound() {
-    const list = Object.values(cards);
-    const now = new Date();
-    let round: StudyCard[];
-    if (mode === "review") {
-      round = list
-        .filter((c) => isCardDue(c, now))
-        .sort((a, b) => new Date(a.progress.dueAt!).getTime() - new Date(b.progress.dueAt!).getTime())
-        .slice(0, settings.roundSize);
-    } else {
-      round = selectRound(list, {
-        now,
-        newAllowed: Math.max(0, payload.newAllowed - introduced),
-        roundSize: settings.roundSize,
-      });
-    }
-    if (round.length === 0) {
+    if (!session) {
       setPhase("done");
       return;
     }
-    setQueue(
-      round.map((c) =>
-        buildQuestion(c, typeFor(c, c.progress), peersByDeck.get(c.deckId) ?? [c], Math.random),
-      ),
-    );
+    const ids = nextRoundIds(session.items, (id) => cards[id].progress, {
+      today: session.today,
+      stepsPerDay: session.stepsPerDay,
+      roundSize: settings.roundSize,
+    });
+    if (ids.length === 0) {
+      setPhase("done");
+      return;
+    }
+    setQueue(ids.map((id) => buildQuestion(cards[id], typeFor(cards[id], cards[id].progress), peersByDeck.get(cards[id].deckId) ?? [cards[id]], Math.random)));
     setPos(0);
     setRoundLog([]);
     setPhase("question");
   }
 
-  const disableSpeak = (reason: string) => {
-    setSpeakOff(true);
-    toast.show(
-      reason === "not-allowed"
-        ? "Microphone access was denied, so speaking questions are skipped for this session. Allow the microphone in your browser's site settings to use them."
-        : "Speech recognition isn't available in this browser, so speaking questions are skipped.",
-      { durationMs: 8000 },
-    );
-    setQueue((qs) => qs.map((q, i) => (i >= pos && q.type === "speak" ? { ...q, type: "write" } : q)));
-  };
-
-  const switchToWrite = () => setQueue((qs) => qs.map((q, i) => (i === pos ? { ...q, type: "write", key: `${q.key}w` } : q)));
+  const sessionTotal = session?.items.length ?? 0;
+  const sessionDone = session ? session.items.filter((it) => cards[it.id] && isDone(cards[it.id])).length : 0;
 
   /* ------------------------------- render ------------------------------- */
 
@@ -315,8 +309,11 @@ export function StudySession({
         exitHref={exitHref}
         totals={totals}
         cards={Object.values(cards)}
+        startStages={startStages}
+        session={session}
         mode={mode}
         empty={payload.questions.length === 0}
+        onKeepGoing={onKeepGoing}
       />
     );
   }
@@ -329,6 +326,12 @@ export function StudySession({
         <SessionHeader title={title} exitHref={exitHref} />
         <div className="panel animate-pop p-6" data-testid="round-summary">
           <h2 className="text-2xl font-extrabold">Round complete!</h2>
+          {session && (
+            <div className="mt-3">
+              <ProgressBar value={sessionDone} max={sessionTotal} label="Words done for today" />
+              <p className="mt-1 text-sm text-muted">Words done for today</p>
+            </div>
+          )}
           <p className="mt-1 text-muted">
             {roundLog.filter((e) => e.correct).length} correct · {roundLog.filter((e) => !e.correct).length} mistakes
           </p>
@@ -359,7 +362,7 @@ export function StudySession({
           )}
           <div className="mt-6 flex gap-3">
             <Link href={exitHref} className="btn-secondary">
-              Finish
+              Stop for now
             </Link>
             <button type="button" className="btn-primary flex-1" onClick={nextRound} autoFocus data-testid="next-round">
               Continue
@@ -376,13 +379,27 @@ export function StudySession({
   return (
     <div className="mx-auto max-w-2xl">
       <SessionHeader title={title} exitHref={exitHref}>
+        {session?.topic && mode === "learn" && (
+          <span className="chip hidden sm:inline-flex" data-testid="topic-chip" title="Topic new words come from">
+            {session.topic}
+          </span>
+        )}
         {adaptive && (
           <span className="chip" data-testid="stage-chip">
             {STAGE_NAMES[card.progress.stage]}
           </span>
         )}
       </SessionHeader>
-      <ProgressBar value={pos + (outcome ? 1 : 0)} max={queue.length} label="Session progress" />
+      {session ? (
+        <>
+          <ProgressBar value={sessionDone} max={sessionTotal} label="Words done for today" />
+          <p className="mt-1 text-xs text-muted" data-testid="round-position">
+            Today&apos;s words done · question {pos + 1} of {queue.length} in this round
+          </p>
+        </>
+      ) : (
+        <ProgressBar value={pos + (outcome ? 1 : 0)} max={queue.length} label="Session progress" />
+      )}
       <div className="sr-only" aria-live="assertive">
         {announce}
       </div>
@@ -391,8 +408,6 @@ export function StudySession({
           <NewCardQuestion {...qProps} />
         ) : current.type === "mc" || current.type === "mc_reverse" || current.type === "listen_mc" ? (
           <MultipleChoiceQuestion {...qProps} />
-        ) : current.type === "speak" ? (
-          <SpeakQuestion {...qProps} onSwitchToWrite={switchToWrite} onSpeechUnavailable={disableSpeak} />
         ) : (
           <WriteQuestion {...qProps} />
         )}
@@ -415,22 +430,37 @@ function Celebration({
   exitHref,
   totals,
   cards,
+  startStages,
+  session,
   mode,
   empty,
+  onKeepGoing,
 }: {
   title: string;
   exitHref: string;
   totals: { correct: number; wrong: number };
   cards: StudyCard[];
+  startStages: Map<string, number>;
+  session: LearnSession | null;
   mode: Mode;
   empty: boolean;
+  onKeepGoing?: () => void;
 }) {
   const { settings } = useApp();
   useEffect(() => {
     if (!empty && settings.soundEffects) playCelebration();
   }, [empty, settings.soundEffects]);
-  const mastered = cards.filter((c) => c.progress.stage >= 6).length;
   const total = totals.correct + totals.wrong;
+  const daily = mode === "learn" || mode === "review";
+  const sessionIds = new Set(session?.items.map((it) => it.id));
+  const practised = cards.filter((c) => sessionIds.has(c.id) && c.progress.dayKey === session?.today).length;
+  const steppedUp = cards.filter((c) => c.progress.stage > (startStages.get(c.id) ?? c.progress.stage)).length;
+  const masteredToday = cards.filter((c) => c.progress.stage >= MAX_STAGE && (startStages.get(c.id) ?? 0) < MAX_STAGE).length;
+  const topics = mode === "learn" ? topicSummary(deckTopics(cards)) : [];
+  const topicBefore = session?.topic ?? null;
+  const topicNow = topics.find((t) => t.current)?.label ?? null;
+  const finishedTopic = topicBefore && topicBefore !== topicNow ? topicBefore : null;
+
   return (
     <div className="mx-auto max-w-xl text-center">
       {!empty && <Confetti />}
@@ -438,24 +468,44 @@ function Celebration({
         <div aria-hidden className="text-6xl">
           {empty ? "✨" : "🎉"}
         </div>
-        <h1 className="mt-2 text-3xl font-black">{empty ? "Nothing to study right now" : "Session complete!"}</h1>
+        <h1 className="mt-2 text-3xl font-black">
+          {daily ? (empty ? "All done for today" : "Done for today!") : "Session complete!"}
+        </h1>
         <p className="mt-2 text-muted">
           {empty
             ? mode === "review"
-              ? "No cards are due. Come back later!"
-              : "Everything here is mastered or waiting for its next review."
-            : `${totals.correct} of ${total} correct${total ? ` (${Math.round((totals.correct / total) * 100)}%)` : ""}.`}
+              ? "No words are due right now. Come back later!"
+              : "Every word here has had its practice for today, or is waiting for its next review."
+            : `${totals.correct} of ${total} answers correct${total ? ` (${Math.round((totals.correct / total) * 100)}%)` : ""}.`}
         </p>
-        {(mode === "learn" || mode === "review") && cards.length > 0 && (
-          <p className="mt-1 text-muted">
-            {mastered} of {cards.length} cards mastered.
+        {daily && !empty && (
+          <ul className="mx-auto mt-4 max-w-xs space-y-1 text-left text-sm" data-testid="day-stats">
+            <li>📚 {practised} words practised</li>
+            <li>⬆️ {steppedUp} words moved up</li>
+            <li>🏆 {masteredToday} words mastered today</li>
+          </ul>
+        )}
+        {finishedTopic && (
+          <p className="mt-4 rounded-xl bg-success-soft px-4 py-2 font-semibold text-success" data-testid="topic-finished">
+            Topic “{finishedTopic}” complete!{topicNow ? ` Next topic: “${topicNow}”.` : ""}
+          </p>
+        )}
+        {daily && (
+          <p className="mt-4 text-sm text-muted">
+            Come back tomorrow: practising a little every day makes words stick much better than repeating them many
+            times in one go.
           </p>
         )}
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link href={exitHref} className="btn-primary">
             Back to {title.length > 24 ? "deck" : title}
           </Link>
-          <Link href="/" className="btn-secondary">
+          {daily && onKeepGoing && mode === "learn" && (
+            <button type="button" className="btn-secondary" onClick={onKeepGoing} data-testid="keep-going">
+              {finishedTopic && topicNow ? `Start “${topicNow}” now` : "Keep going anyway"}
+            </button>
+          )}
+          <Link href="/" className="btn-ghost">
             Dashboard
           </Link>
         </div>

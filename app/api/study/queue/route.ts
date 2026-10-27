@@ -1,5 +1,6 @@
 import { ApiError, ok, requireUser, route } from "@/lib/api";
 import {
+  localDay,
   cardsForDecks,
   decksWithDueCards,
   getDeckCards,
@@ -13,10 +14,14 @@ import {
 import {
   buildQuestion,
   buildTest,
-  isCardDue,
   questionTypeForStage,
-  selectRound,
+  deckTopics,
+  nextRoundIds,
+  planLearnSession,
+  planReviewSession,
   shuffle,
+  topicSummary,
+  type SessionItem,
   type Question,
   type QuestionType,
   type StudyCard,
@@ -26,15 +31,25 @@ import { resolveSettings } from "@/lib/validation";
 
 export const runtime = "nodejs";
 
-const MODES = ["learn", "review", "flashcards", "write", "listen", "speak", "match", "test"] as const;
+export type LearnSession = {
+  items: SessionItem[];
+  /** Local day the session belongs to (YYYY-MM-DD). */
+  today: string;
+  stepsPerDay: number;
+  /** Topic new words come from today (null for reviews / when the deck is finished). */
+  topic: string | null;
+  topics: ReturnType<typeof topicSummary> | null;
+  bonus: number;
+};
+
+const MODES = ["learn", "review", "flashcards", "write", "listen", "match", "test"] as const;
 type Mode = (typeof MODES)[number];
-const TEST_TYPES: TestType[] = ["mc", "write", "dictation", "speak", "true_false"];
+const TEST_TYPES: TestType[] = ["mc", "write", "dictation", "true_false"];
 
 const FIXED_TYPE: Partial<Record<Mode, QuestionType>> = {
   flashcards: "flashcard",
   write: "write",
   listen: "dictation",
-  speak: "speak",
 };
 
 /** Build the ordered questions for a study session (including distractors). */
@@ -44,7 +59,6 @@ export const GET = route(async (req) => {
   const mode = sp.get("mode") as Mode | null;
   if (!mode || !MODES.includes(mode)) throw new ApiError(400, "validation_error", "Unknown study mode");
   const settings = resolveSettings(user.settings);
-  const speakAvailable = sp.get("speak") === "1" && settings.enableSpeaking;
   const tz = Math.max(-840, Math.min(840, Number(sp.get("tz") ?? 0) || 0));
   const now = new Date();
   const rand = Math.random;
@@ -69,45 +83,47 @@ export const GET = route(async (req) => {
 
   let questions: Question[] = [];
   let newAllowed = 0;
-  if (mode === "learn") {
-    newAllowed = newAllowedToday(settings, await newCardsIntroducedToday(user.id, localMidnight(now, tz)));
-    const round = selectRound(cards, { now, newAllowed, roundSize: settings.roundSize });
-    questions = round.map((c) =>
-      buildQuestion(
-        c,
-        questionTypeForStage(c.progress.stage, c.progress.correctStreak, {
-          speakAvailable,
-          deckSize: peers(c).length,
-          rand,
-        }),
-        peers(c),
+  let session: LearnSession | null = null;
+  const questionFor = (c: StudyCard) =>
+    buildQuestion(
+      c,
+      questionTypeForStage(mode === "review" ? Math.max(1, c.progress.stage) : c.progress.stage, c.progress.correctStreak, {
+        deckSize: peers(c).length,
         rand,
-      ),
+      }),
+      peers(c),
+      rand,
     );
-  } else if (mode === "review") {
-    const due = cards
-      .filter((c) => isCardDue(c, now))
-      .sort((a, b) => new Date(a.progress.dueAt!).getTime() - new Date(b.progress.dueAt!).getTime());
-    questions = due.map((c) =>
-      buildQuestion(
-        c,
-        questionTypeForStage(Math.max(1, c.progress.stage), c.progress.correctStreak, {
-          speakAvailable,
-          deckSize: peers(c).length,
-          rand,
-        }),
-        peers(c),
-        rand,
-      ),
-    );
+
+  if (mode === "learn" || mode === "review") {
+    // "Keep going" after the daily session: each bonus level allows one more step per word and 5 more new words.
+    const bonus = Math.max(0, Math.min(3, Number(sp.get("bonus") ?? 0) || 0));
+    const today = localDay(now, tz);
+    const stepsPerDay = settings.stepsPerDay + bonus;
+    let items: SessionItem[];
+    let topic: string | null = null;
+    let topics: ReturnType<typeof topicSummary> | null = null;
+    if (mode === "learn") {
+      newAllowed = newAllowedToday(settings, await newCardsIntroducedToday(user.id, localMidnight(now, tz))) + bonus * 5;
+      const plan = planLearnSession(cards, { now, today, newAllowed, stepsPerDay });
+      items = plan.items;
+      topic = plan.topic?.label ?? null;
+      topics = topicSummary(deckTopics(cards));
+    } else {
+      items = planReviewSession(cards, now);
+    }
+    const byId = new Map(cards.map((c) => [c.id, c]));
+    const first = nextRoundIds(items, (id) => byId.get(id)!.progress, { today, stepsPerDay, roundSize: settings.roundSize });
+    questions = first.map((id) => questionFor(byId.get(id)!));
+    session = { items, today, stepsPerDay, topic, topics, bonus };
   } else if (mode === "test") {
-    const types = (sp.get("types") ?? "mc,write,dictation,speak,true_false")
+    const types = (sp.get("types") ?? "mc,write,dictation,true_false")
       .split(",")
       .filter((t): t is TestType => TEST_TYPES.includes(t as TestType));
     const only = new Set((sp.get("cardIds") ?? "").split(",").filter(Boolean));
     const pool = only.size ? cards.filter((c) => only.has(c.id)) : cards;
     const count = Math.max(1, Math.min(pool.length, Number(sp.get("count") ?? 10) || 10));
-    questions = pool.length ? buildTest(pool, { count, types, speakAvailable }, rand).map((q) => {
+    questions = pool.length ? buildTest(pool, { count, types }, rand).map((q) => {
       // Distractors always come from the whole deck, even when retaking missed cards only.
       if (q.type === "mc" || q.type === "true_false") {
         const card = pool.find((c) => c.id === q.cardId)!;
@@ -117,9 +133,9 @@ export const GET = route(async (req) => {
     }) : [];
   } else if (FIXED_TYPE[mode]) {
     const type = FIXED_TYPE[mode]!;
-    // Write / Listen / Speak use random order; Flashcards keep deck order (shuffle is a UI toggle).
+    // Write / Listen use random order; Flashcards keep deck order (shuffle is a UI toggle).
     const ordered = mode === "flashcards" ? cards : shuffle(cards, rand);
-    questions = ordered.map((c) => buildQuestion(c, type === "speak" && !speakAvailable ? "write" : type, cards, rand));
+    questions = ordered.map((c) => buildQuestion(c, type, cards, rand));
   }
 
   return ok({
@@ -128,6 +144,6 @@ export const GET = route(async (req) => {
     cards,
     questions,
     newAllowed,
-    speakAvailable,
+    session,
   });
 });

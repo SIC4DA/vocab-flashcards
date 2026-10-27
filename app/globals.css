@@ -159,14 +159,6 @@ body {
     transform: translateX(5px);
   }
 }
-@keyframes pulse-ring {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 55%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 22px transparent;
-  }
-}
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
@@ -187,9 +179,6 @@ body {
 }
 .animate-shake {
   animation: shake 0.45s ease-in-out both;
-}
-.animate-listen {
-  animation: pulse-ring 1.1s ease-out infinite;
 }
 .skeleton {
   position: relative;

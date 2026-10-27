@@ -6,7 +6,6 @@ import { api, ApiClientError, tzOffset } from "@/lib/client/api";
 import { playCelebration } from "@/lib/client/sounds";
 import { langDir } from "@/lib/languages";
 import { QUESTION_LABELS, type Question, type StudyCard, type TestType } from "@/lib/learn";
-import { matchSpeech } from "@/lib/speech-match";
 import type { Grade } from "@/lib/srs";
 import { AudioButton } from "../audio";
 import { CardImage } from "../card-image";
@@ -14,21 +13,19 @@ import { useApp, useToast } from "../providers";
 import { SpecialCharsBar, Spinner } from "../ui";
 import type { QueuePayload } from "./session";
 import { postReview, SessionHeader, useEscToExit } from "./session";
-import { useSpeechCapture } from "./use-speech";
 
 const TYPE_OPTIONS: { type: TestType; label: string }[] = [
   { type: "mc", label: "Multiple choice" },
   { type: "write", label: "Write" },
   { type: "dictation", label: "Listen & write" },
-  { type: "speak", label: "Speak" },
   { type: "true_false", label: "True / False" },
 ];
 
-type Answer = { text: string; alternatives?: string[] };
+type Answer = { text: string };
 type Result = { q: Question; card: StudyCard; given: string; correct: boolean };
 
 export function TestRunner({ deckId, cardCount, title, exitHref }: { deckId: string; cardCount: number; title: string; exitHref: string }) {
-  const { settings, speakAvailable } = useApp();
+  const { settings } = useApp();
   const toast = useToast();
   const minCount = Math.min(5, cardCount);
   const [count, setCount] = useState(Math.min(10, cardCount));
@@ -37,20 +34,18 @@ export function TestRunner({ deckId, cardCount, title, exitHref }: { deckId: str
   const [test, setTest] = useState<{ questions: Question[]; cards: Record<string, StudyCard> } | null>(null);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [results, setResults] = useState<Result[] | null>(null);
-  const [speakBroken, setSpeakBroken] = useState(false);
 
   useEscToExit(exitHref, Boolean(test) && !results);
 
   async function start(cardIds?: string[]) {
     setLoading(true);
     try {
-      const chosen = [...types].filter((t) => t !== "speak" || speakAvailable);
+      const chosen = [...types];
       const params = new URLSearchParams({
         deckId,
         mode: "test",
         count: String(cardIds ? cardIds.length : count),
         types: (chosen.length ? chosen : ["write"]).join(","),
-        speak: speakAvailable && !speakBroken ? "1" : "0",
         tz: String(tzOffset()),
       });
       if (cardIds) params.set("cardIds", cardIds.join(","));
@@ -76,10 +71,6 @@ export function TestRunner({ deckId, cardCount, title, exitHref }: { deckId: str
       if (q.type === "mc" || q.type === "true_false") {
         correct = a.text === q.answer;
         grade = correct ? 4 : 1;
-      } else if (q.type === "speak" && a.alternatives) {
-        const m = matchSpeech(a.alternatives, card.term);
-        correct = m.correct;
-        grade = correct ? (m.similarity === 1 ? 4 : 3) : 1;
       } else {
         const r = checkAnswer(a.text, card.term, {
           strictAccents: settings.strictAccents,
@@ -138,18 +129,12 @@ export function TestRunner({ deckId, cardCount, title, exitHref }: { deckId: str
             <legend className="label">Question types</legend>
             <div className="grid gap-2 sm:grid-cols-2">
               {TYPE_OPTIONS.map((o) => {
-                const disabled = o.type === "speak" && !speakAvailable;
                 return (
-                  <label
-                    key={o.type}
-                    className={`flex min-h-11 items-center gap-3 rounded-xl border border-line px-3 ${disabled ? "opacity-50" : "cursor-pointer"}`}
-                    title={disabled ? "Speech recognition isn't available in this browser or is turned off" : undefined}
-                  >
+                  <label key={o.type} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line px-3">
                     <input
                       type="checkbox"
                       className="h-5 w-5 accent-[var(--accent)]"
-                      checked={types.has(o.type) && !disabled}
-                      disabled={disabled}
+                      checked={types.has(o.type)}
                       onChange={(e) =>
                         setTypes((s) => {
                           const n = new Set(s);
@@ -264,11 +249,6 @@ export function TestRunner({ deckId, cardCount, title, exitHref }: { deckId: str
             card={test.cards[q.cardId]}
             answer={answers[q.key]}
             onChange={(a) => setAnswers((s) => ({ ...s, [q.key]: a }))}
-            speakBroken={speakBroken}
-            onSpeakBroken={() => {
-              setSpeakBroken(true);
-              toast.show("Microphone unavailable — type your answers for speaking questions instead.", { durationMs: 7000 });
-            }}
           />
         ))}
         <button type="submit" className="btn-primary w-full" data-testid="submit-test">
@@ -285,26 +265,15 @@ function TestQuestion({
   card,
   answer,
   onChange,
-  speakBroken,
-  onSpeakBroken,
 }: {
   index: number;
   q: Question;
   card: StudyCard;
   answer: Answer | undefined;
   onChange: (a: Answer) => void;
-  speakBroken: boolean;
-  onSpeakBroken: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const name = `q-${q.key}`;
-  const speech = useSpeechCapture({
-    lang: card.termLang,
-    onResult: (alts) => onChange({ text: alts[0] ?? "", alternatives: alts }),
-    onError: (reason) => {
-      if (reason === "not-allowed" || reason === "unsupported") onSpeakBroken();
-    },
-  });
   const heading = (
     <p className="text-xs font-semibold uppercase tracking-wide text-muted">
       {index + 1}. {QUESTION_LABELS[q.type]}
@@ -391,7 +360,7 @@ function TestQuestion({
           </div>
         </>
       )}
-      {(q.type === "write" || (q.type === "speak" && speakBroken)) && (
+      {q.type === "write" && (
         <>
           <div className="mt-2 flex items-center gap-3">
             <CardImage src={card.imageUrl} alt={card.definition} term={card.term} className="h-16 w-16" hideIfMissing />
@@ -410,27 +379,6 @@ function TestQuestion({
           </div>
           {typed("Type what you hear")}
         </>
-      )}
-      {q.type === "speak" && !speakBroken && (
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <CardImage src={card.imageUrl} alt={card.definition} term={card.term} className="h-16 w-16" hideIfMissing />
-          <p className="text-lg font-bold">{card.definition}</p>
-          <button
-            type="button"
-            className={`ml-auto grid h-14 w-14 place-items-center rounded-full text-2xl ${
-              speech.listening ? "animate-listen bg-danger text-white" : "bg-accent text-on-accent"
-            }`}
-            onClick={speech.toggle}
-            aria-pressed={speech.listening}
-            aria-label={speech.listening ? "Stop listening" : `Speak answer ${index + 1}`}
-            data-testid="test-mic"
-          >
-            <span aria-hidden>🎤</span>
-          </button>
-          <p className="w-full text-sm" aria-live="polite">
-            {speech.listening ? speech.transcript || "Listening…" : answer?.text ? `Heard: ${answer.text}` : "Tap the mic and say the term."}
-          </p>
-        </div>
       )}
     </fieldset>
   );

@@ -1,6 +1,6 @@
 # Vocab Flashcards
 
-A personal, Quizlet-style vocabulary app. Make decks of words (term, meaning, picture), then learn them with flashcards, multiple choice, listening, writing, speaking, a Match game and generated tests. An adaptive **Learn** mode moves every word from recognising it to producing it, and **spaced repetition** brings it back right before you'd forget it.
+A personal, Quizlet-style vocabulary app. Make decks of words (term, meaning, picture), then learn them with flashcards, multiple choice, listening, writing, a Match game and generated tests. An adaptive **Learn** mode moves every word from recognising it to producing it, and **spaced repetition** brings it back right before you'd forget it.
 
 Pictures and pronunciation are automatic and need no API keys. AI extras are optional: **each user adds their own free Gemini API key** in Settings, so nobody shares a quota.
 
@@ -19,7 +19,7 @@ Pictures and pronunciation are automatic and need no API keys. AI extras are opt
 - **Smart images** — pictures only where they help (objects, food, colours…, not "to spell"). Found on Openverse (Wikimedia Commons as fallback) when you save; with a Gemini key, AI decides per word and picks the search keyword. Pick another, upload your own (resized to 512 px WebP in the browser), paste a URL or remove it. Licence attribution is shown on the card.
 - **Topics** — with a Gemini key, words are grouped by theme and Learn introduces new words topic by topic.
 - **Pronunciation** — real native-speaker recordings from Wiktionary/Wikimedia Commons when available (free, no key), otherwise the best-sounding voice on the device; optional Gemini cloud voice with the user's own key. Slow replay.
-- **Study modes** — Flashcards (3D flip, swipe), **Learn** (adaptive ladder), Write, Listen (dictation), Speak (speech recognition), Match (timed, best time saved), Test (generated exam with pass mark), and **Review all due** across decks.
+- **Study modes** — Flashcards (3D flip, swipe), **Learn** (adaptive ladder), Write, Listen (dictation), Match (timed, best time saved), Test (generated exam with pass mark), and **Review all due** across decks.
 - **Smart answer checking** — ignores case/spacing/trailing punctuation, accepts `car / automobile` alternatives, “watch the accents”, typo tolerance with an “I was right” override, optional article-ignoring, on-screen special-character bar.
 - **Spaced repetition** — simplified SM-2. Progress is saved after every single answer.
 - **Stats** — stage bar (New / Learning / Mastered), due today, accuracy by mode, per-card table with reset, daily streak.
@@ -35,10 +35,11 @@ Pictures and pronunciation are automatic and need no API keys. AI extras are opt
 | 2 | Recognized | Listening multiple choice, then reverse multiple choice |
 | 3 | Heard | Listen & write (dictation) |
 | 4 | Written | Write the term from the definition + picture |
-| 5 | Spoken | Say the term (skipped when speech isn't available) |
-| 6 | Mastered | Spaced-repetition reviews (Write 40%, Speak 30%, Dictation 20%, MC 10%) |
+| 5 | Mastered | Spaced-repetition reviews (Write 60%, Dictation 25%, MC 15%) |
 
-Two correct answers in a row move a card up (configurable 1–3); a mistake moves it down one stage and it comes back 3–5 questions later.
+**Learn is a daily session.** It picks today's words (due reviews, words in progress, then up to 10 new words from the current topic), asks them in rounds of 7, and ends with "Done for today". One correct answer moves a word up a step (configurable 1–3), and each word climbs at most 2 steps per day (configurable 1–5), so a new word takes about 2 days to master and is then reviewed after 1 day, 6 days, and so on. A mistake moves a word down one step and brings it back 3–5 questions later; after 3 mistakes in a day it rests until tomorrow. Typical session: 5–15 minutes.
+
+**Topics.** New words come one topic at a time: AI topics with a Gemini key, otherwise sets of 8 words in deck order. The next topic starts when 3 of every 4 words in the current one can be written. Earlier topics keep coming back as reviews, so sessions become a mix of everything.
 
 ## Screenshots
 
@@ -82,7 +83,7 @@ There is **no app-wide AI key**. Each user can add their own free key in **Setti
 2. Click **Create API key** and copy it. New keys start with `AQ.` (since May 2026); older `AIza…` keys also work.
 3. In the app: **Settings → AI features** → paste → **Save key**. The app checks it with Google and shows "Connected".
 
-With a key, that user gets: better definition suggestions (plus an example sentence), smart pictures (only for words where a picture helps, with a better search keyword), topic groups that Learn uses to introduce related words together, a cloud voice when their device has no voice for a language (or if they prefer it), speech transcription in browsers without speech recognition (e.g. Firefox), and **✨ Generate deck** from a topic. Usage counts only against their own free quota.
+With a key, that user gets: better definition suggestions (plus an example sentence), smart pictures (only for words where a picture helps, with a better search keyword), topic groups that Learn uses to introduce related words together, a cloud voice when their device has no voice for a language (or if they prefer it), and **✨ Generate deck** from a topic. Usage counts only against their own free quota.
 
 Keys are verified with Google before saving, stored **encrypted** (AES-256-GCM, key derived from `SESSION_SECRET`), used only server-side for that user's own requests, never sent back to the browser and never logged. Calls are rate-limited to 60/minute per user, and any Gemini failure falls back to the free path.
 
@@ -127,18 +128,13 @@ Full check: `npm run lint && npm run typecheck && npm test && npm run test:e2e &
 
 ## Browser support
 
-| Browser | Pronunciation (speech synthesis) | Speaking (speech recognition) |
-|---|---|---|
-| Chrome (desktop & Android) | ✅ | ✅ (uses Google's online service) |
-| Edge | ✅ | ✅ |
-| Safari (macOS & iOS 14.5+) | ✅ | ✅ |
-| Firefox | ✅ | ❌ — Speak mode is disabled with an explanation; users who added a Gemini key get their recordings transcribed by Gemini instead |
+The app works in all modern browsers (Chrome, Edge, Safari, Firefox; desktop and mobile).
 
 Native-speaker recordings (Wiktionary) play in every browser. For words without a recording, available voices depend on your operating system. If there is no voice for a language you'll see a one-time notice; install one in your OS speech settings or add your Gemini key in Settings for cloud audio. Browsers only play speech after you've interacted with the page, so the very first auto-play on a freshly opened tab may be skipped — press 🔊 or `P`.
 
 ## Keyboard shortcuts
 
-`Space` flip / play · `P` play audio · `Enter` submit / continue · `←` / `→` still learning / know it · `1`–`4` choose an option · `M` microphone · `Esc` exit session · `?` list shortcuts
+`Space` flip / play · `P` play audio · `Enter` submit / continue · `←` / `→` still learning / know it · `1`–`4` choose an option · `Esc` exit session · `?` list shortcuts
 
 ## Tech
 

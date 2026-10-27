@@ -142,7 +142,7 @@ Every user does this for themselves in the app; nothing is needed in Vercel.
 
 1. Go to <https://aistudio.google.com/apikey> → sign in with Google → **Create API key** → copy it. New keys start with `AQ.`; older `AIza…` keys work too.
 2. In the app: **⚙️ Settings** → **✨ AI features** → paste the key → **Save key**.
-3. It should say **Connected · key …xxxx**. You now have ✨ Generate deck, better auto-fill, cloud voice, and speech transcription in Firefox. Usage counts only against your own free quota.
+3. It should say **Connected · key …xxxx**. You now have ✨ Generate deck, better auto-fill, smart pictures, topics and a cloud voice. Usage counts only against your own free quota.
 
 Send the same steps to friends who use your app; they can also read them inside the app (Settings → "How do I get a free key?", or the Guide).
 
@@ -157,7 +157,7 @@ The Sign up page will then say "Sign-ups are closed". Existing users can still l
 
 ### Use it on your phone
 
-Open the URL in **Chrome** (Android) or **Safari** (iPhone). Choose **Add to Home Screen** to get an app-like icon. When you first use **Speak**, allow the microphone. On iPhone, make sure the silent switch is off to hear pronunciation.
+Open the URL in **Chrome** (Android) or **Safari** (iPhone). Choose **Add to Home Screen** to get an app-like icon. On iPhone, make sure the silent switch is off to hear pronunciation.
 
 ---
 
@@ -194,7 +194,6 @@ Vercel notices the push and deploys automatically in 1–2 minutes. Database cha
 | The build fails with `[migrate] Failed` | The database isn't reachable. In Storage, make sure the Neon database exists and is connected, then Redeploy. |
 | The first page load after a while is slow (about 1 s) | Normal on the free tier: Neon pauses the database when idle and wakes it on the next visit. |
 | Everyone got logged out, and Gemini says "Not connected" | `SESSION_SECRET` was changed. Log in again and paste your Gemini key again. |
-| **Speak** is greyed out | Firefox doesn't support speech recognition. Use Chrome, Edge or Safari, or add your Gemini key, which lets Firefox transcribe recordings. Also check Settings → "Enable speaking questions". |
 | No sound | Click 🔊 once (browsers block sound until you interact), turn up the volume, check the iPhone silent switch. If the app says your device has no voice for a language, install one in your system's language/speech settings, or add a Gemini key and turn on "Prefer cloud voice". |
 | Gemini key: "Google rejected this key" | Copy the key again from AI Studio (the whole `AQ.…` or `AIza…` string, no spaces). The message shows Google's reason. |
 | AI features stop working for a while | Your free Gemini quota is used up for now. The app falls back to the free features automatically; try again later. |

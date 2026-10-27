@@ -19,7 +19,7 @@ const notoHebrew = Noto_Sans_Hebrew({ variable: "--font-noto-hebrew", subsets: [
 
 export const metadata: Metadata = {
   title: { default: "Vocab Flashcards", template: "%s · Vocab Flashcards" },
-  description: "Learn vocabulary with flashcards, spaced repetition, listening, writing and speaking practice.",
+  description: "Learn vocabulary with flashcards, spaced repetition, listening and writing practice.",
 };
 
 export const viewport: Viewport = {

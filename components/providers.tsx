@@ -3,7 +3,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/client/api";
 import { DEFAULT_SETTINGS, type Settings } from "@/lib/validation";
-import { speechRecognitionSupported, mediaRecorderSupported } from "@/lib/speech";
 import { onNoVoice } from "@/lib/tts";
 import { languageName } from "@/lib/languages";
 
@@ -138,12 +137,6 @@ type AppState = {
   gemini: boolean;
   geminiKeyHint: string | null;
   signups: boolean;
-  /** Browser SpeechRecognition available (null until detected on the client). */
-  speechSupported: boolean | null;
-  /** Gemini transcription can be used instead of SpeechRecognition. */
-  speechFallback: boolean;
-  /** Speak questions can be used right now (supported + enabled). */
-  speakAvailable: boolean;
 };
 
 const AppContext = createContext<AppState>({
@@ -153,9 +146,6 @@ const AppContext = createContext<AppState>({
   gemini: false,
   geminiKeyHint: null,
   signups: true,
-  speechSupported: null,
-  speechFallback: false,
-  speakAvailable: false,
 });
 export const useApp = () => useContext(AppContext);
 
@@ -197,16 +187,6 @@ export function Providers({
   signups: boolean;
 }) {
   const [settings, setSettings] = useState<Settings>(initialSettings);
-  const [speechSupported, setSpeechSupported] = useState<boolean | null>(null);
-  const [recorderSupported, setRecorderSupported] = useState(false);
-
-  useEffect(() => {
-    // Feature detection must run on the client after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSpeechSupported(speechRecognitionSupported());
-    setRecorderSupported(mediaRecorderSupported());
-  }, []);
-
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);
@@ -217,7 +197,6 @@ export function Providers({
     setSettings(res.settings);
   }, []);
 
-  const speechFallback = gemini && !speechSupported && recorderSupported;
   const value = useMemo<AppState>(
     () => ({
       user,
@@ -226,11 +205,8 @@ export function Providers({
       gemini,
       geminiKeyHint,
       signups,
-      speechSupported,
-      speechFallback,
-      speakAvailable: settings.enableSpeaking && (Boolean(speechSupported) || speechFallback),
     }),
-    [user, settings, updateSettings, gemini, geminiKeyHint, signups, speechSupported, speechFallback],
+    [user, settings, updateSettings, gemini, geminiKeyHint, signups],
   );
 
   return (

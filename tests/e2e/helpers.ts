@@ -5,7 +5,7 @@ import fs from "node:fs";
 const THUMB = fs.readFileSync(path.join(__dirname, "fixtures/thumb.png"));
 const WAV = fs.readFileSync(path.join(__dirname, "fixtures/word.wav"));
 
-/** Deterministic Web Speech API mocks (TTS + recognition), injected before any page script. */
+/** Deterministic speech-synthesis mock + audio playback tracking, injected before any page script. */
 const SPEECH_MOCK = () => {
   type Utt = { text: string; lang: string; rate: number; voice: unknown; onend?: () => void; onerror?: () => void };
   const w = window as unknown as Record<string, unknown>;
@@ -52,36 +52,6 @@ const SPEECH_MOCK = () => {
     played.push(this.src);
     return origPlay.call(this);
   };
-
-  // Recognition: window.__speech = { mode: "answer" | "wrong" | "denied", answer: string }
-  w.__speech = { mode: "answer", answer: "" };
-  class Recognition {
-    lang = "";
-    interimResults = false;
-    maxAlternatives = 1;
-    continuous = false;
-    onresult: ((e: unknown) => void) | null = null;
-    onerror: ((e: unknown) => void) | null = null;
-    onend: (() => void) | null = null;
-    start() {
-      const cfg = w.__speech as { mode: string; answer: string };
-      setTimeout(() => {
-        if (cfg.mode === "denied") {
-          this.onerror?.({ error: "not-allowed" });
-          this.onend?.();
-          return;
-        }
-        const text = cfg.mode === "wrong" ? "zzz completely wrong" : cfg.answer;
-        const result = Object.assign([{ transcript: text, confidence: 0.92 }], { isFinal: true });
-        this.onresult?.({ resultIndex: 0, results: [result] });
-        this.onend?.();
-      }, 60);
-    }
-    stop() {}
-    abort() {}
-  }
-  Object.defineProperty(window, "SpeechRecognition", { value: Recognition, configurable: true });
-  Object.defineProperty(window, "webkitSpeechRecognition", { value: Recognition, configurable: true });
 };
 
 type Fixtures = { consoleErrors: string[]; allowConsole: (re: RegExp) => void };

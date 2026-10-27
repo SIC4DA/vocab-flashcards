@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { ok, parseJson, requireUser, route } from "@/lib/api";
 import { getDb, schema } from "@/lib/db/client";
-import { getOwnedCard, saveProgress, toProgress } from "@/lib/data";
+import { getOwnedCard, localDay, saveProgress, toProgress } from "@/lib/data";
 import { applyAnswer, applyFlashcardMark, applyView } from "@/lib/learn";
 import type { Grade } from "@/lib/srs";
 import { resolveSettings, reviewSchema } from "@/lib/validation";
@@ -23,18 +23,18 @@ export const POST = route(async (req) => {
   if (input.mode === "flashcards") {
     result = applyFlashcardMark(current, input.known ?? input.correct, now);
   } else if (input.questionType === "flashcard") {
-    result = applyView(current, now);
+    result = applyView(current, now, localDay(now, input.tz ?? 0));
   } else {
     result = applyAnswer(
       current,
       {
         correct: input.correct,
         grade: input.grade as Grade | undefined,
-        type: input.questionType ?? (input.mode === "speak" ? "speak" : input.mode === "listen" ? "dictation" : "write"),
+        type: input.questionType ?? (input.mode === "listen" ? "dictation" : "write"),
         ladder: input.mode === "learn" || input.mode === "review",
         responseMs: input.responseMs,
       },
-      { advanceAfter: settings.advanceAfter, speakAvailable: Boolean(input.speakAvailable) && settings.enableSpeaking },
+      { advanceAfter: settings.advanceAfter, today: localDay(now, input.tz ?? 0) },
       now,
     );
   }
