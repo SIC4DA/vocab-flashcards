@@ -20,6 +20,7 @@ Pictures and pronunciation are automatic and need no API keys. AI extras are opt
 - **Topics** — with a Gemini key, words are grouped by theme and Learn introduces new words topic by topic.
 - **Pronunciation** — real native-speaker recordings from Wiktionary/Wikimedia Commons when available (free, no key), otherwise the best-sounding voice on the device; optional Gemini cloud voice with the user's own key. Slow replay.
 - **Study modes** — Flashcards (3D flip, swipe), **Learn** (adaptive ladder), Write, Listen (dictation), Match (timed, best time saved), Test (generated exam with pass mark), and **Review all due** across decks.
+- **Sentences (words in context)** — import or generate sentences (and question → reply pairs). Each one unlocks once you've mastered its words, then climbs its own ladder: fill in the blank → sentence card → word-order puzzle → question & answer matching. Unlocked sentences join the daily Learn session; word cards show an example sentence on the back (tap "Example ▸").
 - **Smart answer checking** — ignores case/spacing/trailing punctuation, accepts `car / automobile` alternatives, “watch the accents”, typo tolerance with an “I was right” override, optional article-ignoring, on-screen special-character bar.
 - **Spaced repetition** — simplified SM-2. Progress is saved after every single answer.
 - **Stats** — stage bar (New / Learning / Mastered), due today, accuracy by mode, per-card table with reset, daily streak.

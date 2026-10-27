@@ -313,6 +313,15 @@ export function SettingsView() {
           onChange={(v) => save({ stepsPerDay: v })}
         />
         <NumberField id="s-new" label="New words per day" value={settings.newPerDay} min={1} max={100} onChange={(v) => save({ newPerDay: v })} />
+        <NumberField
+          id="s-sentences"
+          label="Sentences per day"
+          hint="Unlocked sentence exercises added to your daily Learn session (0 = none)"
+          value={settings.sentencesPerDay}
+          min={0}
+          max={20}
+          onChange={(v) => save({ sentencesPerDay: v })}
+        />
         <NumberField id="s-round" label="Learn round size" value={settings.roundSize} min={5} max={15} onChange={(v) => save({ roundSize: v })} />
         <NumberField id="s-pass" label="Test pass mark (%)" value={settings.passMark} min={50} max={100} onChange={(v) => save({ passMark: v })} />
       </section>

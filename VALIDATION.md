@@ -10,8 +10,8 @@ Command: `npm run lint && npm run typecheck && npm test && npm run test:e2e && n
 |---|---|
 | `npm run lint` | ✅ 0 errors, 0 warnings (`--max-warnings=0`) |
 | `npm run typecheck` | ✅ `next typegen && tsc --noEmit`, strict mode, no errors |
-| `npm test` (Vitest) | ✅ **134 tests in 12 files** passed (unit + integration on in-memory PGlite, no network) |
-| `npm run test:e2e` (Playwright) | ✅ **38 tests** passed (19 scenarios × desktop 1280 px and mobile Pixel 7 viewports, Chromium, production build) |
+| `npm test` (Vitest) | ✅ **155 tests in 14 files** passed (unit + integration on in-memory PGlite, no network) |
+| `npm run test:e2e` (Playwright) | ✅ **40 tests** passed (20 scenarios × desktop 1280 px and mobile Pixel 7 viewports, Chromium, production build) |
 | `npm run build` | ✅ migrations step (skipped without `DATABASE_URL`) + `next build`, no warnings |
 
 ### Unit tests (`tests/unit`)
@@ -73,6 +73,13 @@ Speaking practice was removed at the owner's request (see DECISIONS.md #68–71)
 - **Simulation of the new daily Learn** (40-word deck, 14 days): 27 questions/day on average at 90% accuracy (longest day 43), 37 at 75% (longest 61); at most 6 times per word per day; a new topic about every 2 days; all words mastered by day 10 at 90% accuracy.
 - Unit tests cover session planning order, daily step limits, the free first view, mistakes not consuming steps, the 3-mistake cap, reviews done after one correct answer, words excluded once their day is done, topics (AI labels, sets of 8, 75% rule, summary), and an "it never becomes endless" regression bound (≤ 60 questions, ≤ 6 per word for 10 new words at 75%).
 - E2E: with default settings, a 4-word deck takes exactly 12 questions (each word: see → multiple choice → listening), ends with "Done for today!", shows the stats, and "Keep going anyway" continues with dictation; the deck page shows the set as "Learning now". The full-ladder test (5 steps/day) still follows one word to Mastered and checks wrong answers return 3–5 questions later.
+
+### Update: sentences
+
+- Unit tests: tokenizing, word linking (German examples: *kommst → kommen*, *heißt → heißen*, *geht's → gehen*, *der Hund*, *guten Morgen*; *sehen* is **not** linked to *sehr*), sentence import (pairs, errors), unlock rules, the sentence ladder (with and without a reply, mistakes, daily limits), planning, and each exercise builder (fill in the blank incl. blanking the reply, word order, Q&A board and single-pair "choose the reply").
+- Integration tests: saving and relinking when words change, unlocking after mastering words, sentences in Learn and Sentences mode, examples on word cards, sentence reviews updating progress, editing restarting the ladder, privacy (404 for other users), duplication, and Gemini sentence generation (mocked).
+- E2E (desktop + mobile, 3 consecutive passing runs): import 2 sentences in the editor → both locked with "needs: sehr, gut" → learn the 3 words to Mastered (the example sentence shows on a card back) → both unlock → Sentences mode runs fill in the blank → sentence → word order (→ Q&A for the pair) → both mastered.
+- Screenshots of every sentence exercise were reviewed at 390 px and 1280 px.
 
 ## 14.2 Manual checklist
 

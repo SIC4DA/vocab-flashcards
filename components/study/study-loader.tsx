@@ -8,7 +8,7 @@ import { MatchGame } from "./match-game";
 import { StudySession, type QueuePayload } from "./session";
 import { TestRunner } from "./test-runner";
 
-export type StudyMode = "learn" | "flashcards" | "write" | "listen" | "match" | "test" | "review";
+export type StudyMode = "learn" | "flashcards" | "write" | "listen" | "match" | "test" | "review" | "sentences";
 
 function SessionSkeleton() {
   return (
@@ -80,7 +80,7 @@ export function StudyLoader({
           title={title}
           exitHref={exitHref}
           onKeepGoing={
-            mode === "learn" && bonus < 3
+            (mode === "learn" || mode === "sentences") && bonus < 3
               ? () => {
                   setPayload(null);
                   setBonus((b) => b + 1);

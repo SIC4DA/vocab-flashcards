@@ -33,6 +33,23 @@ import {
   WriteQuestion,
   type Outcome,
 } from "./questions";
+import {
+  FillBlankQuestion,
+  QaMatchQuestion,
+  SentenceFeedback,
+  SentenceReadQuestion,
+  WordOrderQuestion,
+  type SentenceOutcome,
+} from "./sentence-questions";
+import {
+  applySentenceAnswer,
+  buildSentenceQuestion,
+  SENTENCE_MASTERED,
+  SENTENCE_STAGE_NAMES,
+  sentenceTypeForStage,
+  type SentenceQuestion,
+  type StudySentence,
+} from "@/lib/sentences";
 
 export type LearnSession = {
   items: { id: string; kind: SessionKind }[];
@@ -46,12 +63,15 @@ export type LearnSession = {
 export type QueuePayload = {
   mode: string;
   cards: StudyCard[];
-  questions: Question[];
+  questions: (Question | SentenceQuestion)[];
   newAllowed: number;
   session?: LearnSession | null;
+  sentences?: StudySentence[];
 };
 
-type Mode = "learn" | "review" | "write" | "listen";
+const isSentenceQ = (q: Question | SentenceQuestion | undefined): q is SentenceQuestion => Boolean(q && "sentenceId" in q);
+
+type Mode = "learn" | "review" | "write" | "listen" | "sentences";
 type LogEntry = { cardId: string; correct: boolean; before: number; after: number };
 
 export type ReviewBody = {
@@ -124,19 +144,24 @@ export function StudySession({
   onKeepGoing?: () => void;
 }) {
   const { settings } = useApp();
-  const adaptive = mode === "learn" || mode === "review";
+  const adaptive = mode === "learn" || mode === "review" || mode === "sentences";
   const session = payload.session ?? null;
   const kindOf = useMemo(() => new Map((session?.items ?? []).map((it) => [it.id, it.kind])), [session]);
   const [startStages] = useState(() => new Map(payload.cards.map((c) => [c.id, c.progress.stage])));
   const isDone = useCallback(
-    (c: StudyCard) =>
+    (c: { id: string; progress: Progress }) =>
       session ? doneToday(c.progress, kindOf.get(c.id) ?? "learning", session.today, session.stepsPerDay) : false,
     [session, kindOf],
   );
+  const [sentences, setSentences] = useState<Record<string, StudySentence>>(() =>
+    Object.fromEntries((payload.sentences ?? []).map((x) => [x.id, x])),
+  );
+  const [startSentenceStages] = useState(() => new Map((payload.sentences ?? []).map((x) => [x.id, x.progress.stage])));
+  const [sentenceOutcome, setSentenceOutcome] = useState<SentenceOutcome | null>(null);
   const [cards, setCards] = useState<Record<string, StudyCard>>(() =>
     Object.fromEntries(payload.cards.map((c) => [c.id, c])),
   );
-  const [queue, setQueue] = useState<Question[]>(payload.questions);
+  const [queue, setQueue] = useState<(Question | SentenceQuestion)[]>(payload.questions);
   const [pos, setPos] = useState(0);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [phase, setPhase] = useState<"question" | "summary" | "done">(payload.questions.length ? "question" : "done");
@@ -150,7 +175,10 @@ export function StudySession({
   useEscToExit(exitHref, phase !== "done");
 
   const current = queue[pos];
-  const card = current ? cards[current.cardId] : undefined;
+  const sentenceQ = isSentenceQ(current) ? current : undefined;
+  const wordQ = current && !isSentenceQ(current) ? current : undefined;
+  const card = wordQ ? cards[wordQ.cardId] : undefined;
+  const sentence = sentenceQ ? sentences[sentenceQ.sentenceId] : undefined;
   const peersByDeck = useMemo(() => {
     const m = new Map<string, StudyCard[]>();
     for (const c of Object.values(cards)) m.set(c.deckId, [...(m.get(c.deckId) ?? []), c]);
@@ -162,7 +190,8 @@ export function StudySession({
   }, [current?.key]);
 
   // Look up the next word's recording in advance so it plays instantly.
-  const nextCard = queue[pos + 1] ? cards[queue[pos + 1].cardId] : undefined;
+  const nextQ = queue[pos + 1];
+  const nextCard = nextQ && !isSentenceQ(nextQ) ? cards[nextQ.cardId] : undefined;
   useEffect(() => {
     if (card) prefetchPronunciation(card.term, card.termLang);
     if (nextCard) prefetchPronunciation(nextCard.term, nextCard.termLang);
@@ -190,27 +219,72 @@ export function StudySession({
     [],
   );
 
+  const sentenceQuestionFor = (st: StudySentence) =>
+    buildSentenceQuestion(st, sentenceTypeForStage(st, st.progress.stage, Math.random), {
+      cards: Object.values(cards),
+      peers: Object.values(sentences).filter((x) => x.unlocked),
+      rand: Math.random,
+    });
+
+  function onSentenceAnswer(o: SentenceOutcome) {
+    if (!sentenceQ || !sentence || sentenceOutcome) return;
+    const responseMs = Math.round(performance.now() - shownAt.current);
+    const progress = applySentenceAnswer(
+      sentence.progress,
+      { correct: o.correct, type: sentenceQ.type, hasReply: Boolean(sentence.reply), responseMs },
+      { today: session?.today },
+    );
+    const updated = { ...sentence, progress };
+    setSentences((ss) => ({ ...ss, [sentence.id]: updated }));
+    void (async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await api<{ progress: Progress }>("/api/sentence-review", {
+            body: { sentenceId: sentence.id, mode: mode === "sentences" ? "sentences" : "learn", type: sentenceQ.type, correct: o.correct, answerGiven: o.answerGiven, responseMs, tz: tzOffset() },
+          });
+          setSentences((ss) => ({ ...ss, [sentence.id]: { ...ss[sentence.id], progress: res.progress } }));
+          return;
+        } catch {
+          // retry once
+        }
+      }
+    })();
+    if (!o.correct && !isDone(updated)) {
+      const again = sentenceQuestionFor(updated);
+      setQueue((qs) => {
+        const copy = qs.slice();
+        copy.splice(reinsertIndex(pos, copy.length, Math.random), 0, again);
+        return copy;
+      });
+    }
+    setSentenceOutcome(o);
+    setTotals((t) => (o.correct ? { ...t, correct: t.correct + 1 } : { ...t, wrong: t.wrong + 1 }));
+    setRoundLog((l) => [...l, { cardId: sentence.id, correct: o.correct, before: sentence.progress.stage, after: progress.stage }]);
+    setAnnounce(o.correct ? "Correct" : "Not quite");
+    if (settings.soundEffects && sentenceQ.type !== "sentence_read") playFeedback(o.correct);
+  }
+
   function onAnswer(o: Outcome) {
-    if (!current || !card || outcome) return;
+    if (!current || !card || !wordQ || outcome) return;
     const responseMs = Math.round(performance.now() - shownAt.current);
     const before = card.progress;
     const { progress } = applyAnswer(
       before,
-      { correct: o.correct, grade: o.grade, type: current.type, ladder: adaptive, responseMs },
+      { correct: o.correct, grade: o.grade, type: wordQ.type, ladder: adaptive, responseMs },
       { advanceAfter: settings.advanceAfter, today: session?.today },
     );
     setCards((cs) => ({ ...cs, [card.id]: { ...card, progress } }));
     const body: ReviewBody = {
       cardId: card.id,
       mode,
-      questionType: current.type,
+      questionType: wordQ.type,
       correct: o.correct,
       grade: o.grade,
       answerGiven: o.answerGiven,
       responseMs,
     };
 
-    if (current.type === "flashcard") {
+    if (wordQ.type === "flashcard") {
       commit(body);
       setRoundLog((l) => [...l, { cardId: card.id, correct: true, before: before.stage, after: progress.stage }]);
       advance();
@@ -245,12 +319,12 @@ export function StudySession({
 
   function override() {
     const p = pending.current;
-    if (!p || !card || !outcome || !current) return;
+    if (!p || !card || !outcome || !wordQ) return;
     pending.current = null;
     setOverridable(false);
     const { progress } = applyAnswer(
       p.before,
-      { correct: true, grade: 3, type: current.type, ladder: adaptive },
+      { correct: true, grade: 3, type: wordQ.type, ladder: adaptive },
       { advanceAfter: settings.advanceAfter, today: session?.today },
     );
     setCards((cs) => ({ ...cs, [card.id]: { ...card, progress } }));
@@ -269,6 +343,7 @@ export function StudySession({
     }
     setOverridable(false);
     setOutcome(null);
+    setSentenceOutcome(null);
     stopSpeaking();
     if (pos + 1 < queue.length) {
       setPos(pos + 1);
@@ -282,7 +357,7 @@ export function StudySession({
       setPhase("done");
       return;
     }
-    const ids = nextRoundIds(session.items, (id) => cards[id].progress, {
+    const ids = nextRoundIds(session.items, (id) => (cards[id] ?? sentences[id]).progress, {
       today: session.today,
       stepsPerDay: session.stepsPerDay,
       roundSize: settings.roundSize,
@@ -291,14 +366,25 @@ export function StudySession({
       setPhase("done");
       return;
     }
-    setQueue(ids.map((id) => buildQuestion(cards[id], typeFor(cards[id], cards[id].progress), peersByDeck.get(cards[id].deckId) ?? [cards[id]], Math.random)));
+    setQueue(
+      ids.map((id) =>
+        sentences[id]
+          ? sentenceQuestionFor(sentences[id])
+          : buildQuestion(cards[id], typeFor(cards[id], cards[id].progress), peersByDeck.get(cards[id].deckId) ?? [cards[id]], Math.random),
+      ),
+    );
     setPos(0);
     setRoundLog([]);
     setPhase("question");
   }
 
   const sessionTotal = session?.items.length ?? 0;
-  const sessionDone = session ? session.items.filter((it) => cards[it.id] && isDone(cards[it.id])).length : 0;
+  const sessionDone = session
+    ? session.items.filter((it) => {
+        const x = cards[it.id] ?? sentences[it.id];
+        return x && isDone(x);
+      }).length
+    : 0;
 
   /* ------------------------------- render ------------------------------- */
 
@@ -310,6 +396,8 @@ export function StudySession({
         totals={totals}
         cards={Object.values(cards)}
         startStages={startStages}
+        sentences={Object.values(sentences)}
+        startSentenceStages={startSentenceStages}
         session={session}
         mode={mode}
         empty={payload.questions.length === 0}
@@ -341,8 +429,12 @@ export function StudySession({
               <ul className="mt-1 space-y-1">
                 {Array.from(new Map(movedUp.map((e) => [e.cardId, e])).values()).map((e) => (
                   <li key={e.cardId} className="flex justify-between gap-2">
-                    <span className="font-semibold">{cards[e.cardId]?.term}</span>
-                    <span className="text-sm text-muted">{STAGE_NAMES[cards[e.cardId]?.progress.stage ?? e.after]}</span>
+                    <span className="font-semibold">{cards[e.cardId]?.term ?? sentences[e.cardId]?.text}</span>
+                    <span className="text-sm text-muted">
+                      {cards[e.cardId]
+                        ? STAGE_NAMES[cards[e.cardId].progress.stage]
+                        : SENTENCE_STAGE_NAMES[Math.min(SENTENCE_MASTERED, sentences[e.cardId]?.progress.stage ?? e.after)]}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -354,7 +446,13 @@ export function StudySession({
               <ul className="mt-1 space-y-1">
                 {mistakes.map((id) => (
                   <li key={id}>
-                    <b>{cards[id]?.term}</b> — {cards[id]?.definition}
+                    {cards[id] ? (
+                      <>
+                        <b>{cards[id].term}</b> — {cards[id].definition}
+                      </>
+                    ) : (
+                      <b>{sentences[id]?.text}</b>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -373,9 +471,47 @@ export function StudySession({
     );
   }
 
-  if (!current || !card) return null;
+  if (sentenceQ && sentence) {
+    const sProps = { question: sentenceQ, sentence, answered: sentenceOutcome, onAnswer: onSentenceAnswer };
+    return (
+      <div className="mx-auto max-w-2xl">
+        <SessionHeader title={title} exitHref={exitHref}>
+          <span className="chip" data-testid="stage-chip">
+            Sentence · {SENTENCE_STAGE_NAMES[Math.min(SENTENCE_MASTERED, sentence.progress.stage)]}
+          </span>
+        </SessionHeader>
+        {session && (
+          <>
+            <ProgressBar value={sessionDone} max={sessionTotal} label="Today’s progress" />
+            <p className="mt-1 text-xs text-muted">
+              Today&apos;s progress · question {pos + 1} of {queue.length} in this round
+            </p>
+          </>
+        )}
+        <div className="sr-only" aria-live="assertive">
+          {announce}
+        </div>
+        <div className="panel mt-4 p-4 sm:p-6" data-testid="question" data-type={sentenceQ.type} data-sentence-id={sentence.id} key={sentenceQ.key}>
+          {sentenceQ.type === "fill_blank" ? (
+            <FillBlankQuestion {...sProps} />
+          ) : sentenceQ.type === "sentence_read" ? (
+            <SentenceReadQuestion {...sProps} />
+          ) : sentenceQ.type === "word_order" ? (
+            <WordOrderQuestion {...sProps} />
+          ) : (
+            <QaMatchQuestion {...sProps} />
+          )}
+          {sentenceOutcome && (
+            <SentenceFeedback key={`sfb-${sentenceQ.key}`} sentence={sentence} question={sentenceQ} outcome={sentenceOutcome} onContinue={advance} />
+          )}
+        </div>
+      </div>
+    );
+  }
 
-  const qProps = { question: current, card, answered: outcome, onAnswer };
+  if (!wordQ || !card) return null;
+
+  const qProps = { question: wordQ, card, answered: outcome, onAnswer };
   return (
     <div className="mx-auto max-w-2xl">
       <SessionHeader title={title} exitHref={exitHref}>
@@ -394,7 +530,7 @@ export function StudySession({
         <>
           <ProgressBar value={sessionDone} max={sessionTotal} label="Words done for today" />
           <p className="mt-1 text-xs text-muted" data-testid="round-position">
-            Today&apos;s words done · question {pos + 1} of {queue.length} in this round
+            Today&apos;s progress · question {pos + 1} of {queue.length} in this round
           </p>
         </>
       ) : (
@@ -403,17 +539,17 @@ export function StudySession({
       <div className="sr-only" aria-live="assertive">
         {announce}
       </div>
-      <div className="panel mt-4 p-4 sm:p-6" data-testid="question" data-type={current.type} data-card-id={card.id} key={current.key}>
-        {current.type === "flashcard" ? (
+      <div className="panel mt-4 p-4 sm:p-6" data-testid="question" data-type={wordQ.type} data-card-id={card.id} key={wordQ.key}>
+        {wordQ.type === "flashcard" ? (
           <NewCardQuestion {...qProps} />
-        ) : current.type === "mc" || current.type === "mc_reverse" || current.type === "listen_mc" ? (
+        ) : wordQ.type === "mc" || wordQ.type === "mc_reverse" || wordQ.type === "listen_mc" ? (
           <MultipleChoiceQuestion {...qProps} />
         ) : (
           <WriteQuestion {...qProps} />
         )}
         {outcome && (
           <Feedback
-            key={`fb-${current.key}`}
+            key={`fb-${wordQ.key}`}
             card={card}
             outcome={outcome}
             onOverride={overridable ? override : undefined}
@@ -431,6 +567,8 @@ function Celebration({
   totals,
   cards,
   startStages,
+  sentences,
+  startSentenceStages,
   session,
   mode,
   empty,
@@ -441,6 +579,8 @@ function Celebration({
   totals: { correct: number; wrong: number };
   cards: StudyCard[];
   startStages: Map<string, number>;
+  sentences: StudySentence[];
+  startSentenceStages: Map<string, number>;
   session: LearnSession | null;
   mode: Mode;
   empty: boolean;
@@ -451,8 +591,12 @@ function Celebration({
     if (!empty && settings.soundEffects) playCelebration();
   }, [empty, settings.soundEffects]);
   const total = totals.correct + totals.wrong;
-  const daily = mode === "learn" || mode === "review";
   const sessionIds = new Set(session?.items.map((it) => it.id));
+  const daily = mode === "learn" || mode === "review" || mode === "sentences";
+  const sentencesPractised = sentences.filter((x) => sessionIds.has(x.id) && x.progress.dayKey === session?.today).length;
+  const sentencesMastered = sentences.filter(
+    (x) => x.progress.stage >= SENTENCE_MASTERED && (startSentenceStages.get(x.id) ?? 0) < SENTENCE_MASTERED,
+  ).length;
   const practised = cards.filter((c) => sessionIds.has(c.id) && c.progress.dayKey === session?.today).length;
   const steppedUp = cards.filter((c) => c.progress.stage > (startStages.get(c.id) ?? c.progress.stage)).length;
   const masteredToday = cards.filter((c) => c.progress.stage >= MAX_STAGE && (startStages.get(c.id) ?? 0) < MAX_STAGE).length;
@@ -475,12 +619,16 @@ function Celebration({
           {empty
             ? mode === "review"
               ? "No words are due right now. Come back later!"
-              : "Every word here has had its practice for today, or is waiting for its next review."
+              : mode === "sentences"
+                ? "No sentences are ready right now. Sentences unlock when you’ve mastered all the deck words in them — keep learning words, or add sentences in the editor."
+                : "Every word here has had its practice for today, or is waiting for its next review."
             : `${totals.correct} of ${total} answers correct${total ? ` (${Math.round((totals.correct / total) * 100)}%)` : ""}.`}
         </p>
         {daily && !empty && (
           <ul className="mx-auto mt-4 max-w-xs space-y-1 text-left text-sm" data-testid="day-stats">
-            <li>📚 {practised} words practised</li>
+            {mode !== "sentences" && <li>📚 {practised} words practised</li>}
+            {sentencesPractised > 0 && <li>💬 {sentencesPractised} sentences practised</li>}
+            {sentencesMastered > 0 && <li>🌟 {sentencesMastered} sentences mastered</li>}
             <li>⬆️ {steppedUp} words moved up</li>
             <li>🏆 {masteredToday} words mastered today</li>
           </ul>
@@ -500,7 +648,7 @@ function Celebration({
           <Link href={exitHref} className="btn-primary">
             Back to {title.length > 24 ? "deck" : title}
           </Link>
-          {daily && onKeepGoing && mode === "learn" && (
+          {daily && onKeepGoing && (mode === "learn" || (mode === "sentences" && !empty)) && (
             <button type="button" className="btn-secondary" onClick={onKeepGoing} data-testid="keep-going">
               {finishedTopic && topicNow ? `Start “${topicNow}” now` : "Keep going anyway"}
             </button>

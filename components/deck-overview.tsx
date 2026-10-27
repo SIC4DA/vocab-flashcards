@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { api, ApiClientError } from "@/lib/client/api";
-import type { CardDTO, DeckDTO } from "@/lib/data";
+import type { CardDTO, DeckDTO, SentenceDTO } from "@/lib/data";
+import { SENTENCE_MASTERED } from "@/lib/sentences";
 import { getLanguage, langDir } from "@/lib/languages";
 import { deckTopics, NEW_PROGRESS, QUESTION_LABELS, STAGE_NAMES, stageBuckets, topicSummary, type QuestionType, type StudyCard } from "@/lib/learn";
 import { isDue } from "@/lib/srs";
@@ -21,6 +22,7 @@ export const MODES = [
   { mode: "listen", icon: "🎧", label: "Listen", desc: "Dictation" },
   { mode: "match", icon: "🎯", label: "Match", desc: "Beat the clock" },
   { mode: "test", icon: "📝", label: "Test", desc: "Generated exam" },
+  { mode: "sentences", icon: "💬", label: "Sentences", desc: "Words in context" },
 ] as const;
 
 const MODE_STAT_LABELS: Record<string, string> = {
@@ -38,7 +40,15 @@ function formatDue(iso: string | null, stage: number) {
   return d.toLocaleDateString();
 }
 
-export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; cards: CardDTO[] }) {
+export function DeckOverview({
+  deck,
+  cards: initialCards,
+  sentences = [],
+}: {
+  deck: DeckDTO;
+  cards: CardDTO[];
+  sentences?: SentenceDTO[];
+}) {
   const router = useRouter();
   const toast = useToast();
   const confirm = useConfirm();
@@ -193,7 +203,7 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
         <>
           <section aria-label="Study modes">
             <h2 className="sr-only">Study modes</h2>
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
               {MODES.map((m) => {
                 const inner = (
                   <>
@@ -201,7 +211,11 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
                       {m.icon}
                     </span>
                     <span className="font-bold">{m.label}</span>
-                    <span className={`text-xs ${m.mode === "learn" ? "opacity-90" : "text-muted"}`}>{m.desc}</span>
+                    <span className={`text-xs ${m.mode === "learn" ? "opacity-90" : "text-muted"}`}>
+                      {m.mode === "sentences" && sentences.length
+                        ? `${sentences.filter((x) => x.unlocked).length}/${sentences.length} unlocked`
+                        : m.desc}
+                    </span>
                   </>
                 );
                 const cls =
@@ -263,6 +277,8 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
               ))}
             </ol>
           </section>
+
+          <SentencesPanel deckId={deck.id} sentences={sentences} cards={cards} />
 
           <section className="grid gap-4 md:grid-cols-[2fr_1fr]" aria-label="Progress">
             <div className="panel p-5">
@@ -408,5 +424,62 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
         </>
       )}
     </div>
+  );
+}
+
+function SentencesPanel({ deckId, sentences, cards }: { deckId: string; sentences: SentenceDTO[]; cards: CardDTO[] }) {
+  const termOf = new Map(cards.map((c) => [c.id, c]));
+  const unlocked = sentences.filter((x) => x.unlocked);
+  const mastered = sentences.filter((x) => x.progress.stage >= SENTENCE_MASTERED);
+  const locked = sentences.filter((x) => !x.unlocked);
+  return (
+    <section className="panel p-5" aria-labelledby="sentences-h" data-testid="sentences-panel">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="sentences-h" className="font-bold">
+          💬 Sentences
+        </h2>
+        {sentences.length > 0 && (
+          <p className="text-sm text-muted" data-testid="sentences-summary">
+            {unlocked.length}/{sentences.length} unlocked · {mastered.length} mastered
+          </p>
+        )}
+      </div>
+      {sentences.length === 0 ? (
+        <p className="mt-2 text-sm text-muted">
+          Add example sentences in the editor (📋 Bulk import → Sentences). Each sentence unlocks once you’ve mastered the
+          deck words in it, then you practise it: fill in the blank → read it → put the words in order → match questions
+          with replies.{" "}
+          <Link href={`/decks/${deckId}/edit`} className="font-semibold text-accent hover:underline">
+            Add sentences
+          </Link>
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-xs text-muted">
+            Unlocked sentences join your daily Learn session. A sentence unlocks when every deck word in it is mastered.
+          </p>
+          {locked.length > 0 && (
+            <ul className="mt-3 space-y-1 text-sm" aria-label="Locked sentences">
+              {locked.slice(0, 5).map((x) => {
+                const missing = x.cardIds
+                  .map((id) => termOf.get(id))
+                  .filter((c): c is CardDTO => Boolean(c) && c!.progress.stage < 6)
+                  .map((c) => c.term);
+                return (
+                  <li key={x.id} className="flex flex-wrap items-baseline gap-x-2" data-testid="locked-sentence">
+                    <span aria-hidden>🔒</span>
+                    <span className="font-medium">{x.text}</span>
+                    <span className="text-xs text-muted">
+                      {missing.length ? `needs: ${missing.join(", ")}` : "unlocks after your first mastered word"}
+                    </span>
+                  </li>
+                );
+              })}
+              {locked.length > 5 && <li className="text-xs text-muted">…and {locked.length - 5} more</li>}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
   );
 }

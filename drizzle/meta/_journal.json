@@ -36,6 +36,13 @@
       "when": 1793087140224,
       "tag": "0004_daily_learn",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793089003495,
+      "tag": "0005_sentences",
+      "breakpoints": true
     }
   ]
 }

@@ -252,6 +252,33 @@ export function WriteQuestion({ question, card, answered, onAnswer }: QuestionPr
 
 /* ------------------------------- Flashcard ------------------------------- */
 
+/** The example sentence stays folded away until you want it. */
+export function ExampleToggle({ card }: { card: StudyCard }) {
+  const [open, setOpen] = useState(false);
+  if (!card.example) return null;
+  return open ? (
+    <div className="max-w-md text-center" onClick={(e) => e.stopPropagation()} data-testid="example">
+      <p className="flex items-center justify-center gap-1 italic" dir={langDir(card.termLang)} lang={card.termLang}>
+        “{card.example}”
+        <AudioButton text={card.example} lang={card.termLang} size="sm" label="Play the example" />
+      </p>
+      {card.exampleTranslation && <p className="text-sm text-muted">{card.exampleTranslation}</p>}
+    </div>
+  ) : (
+    <button
+      type="button"
+      className="rounded-lg px-3 py-1 text-sm font-semibold text-accent hover:bg-accent-soft"
+      onClick={(e) => {
+        e.stopPropagation();
+        setOpen(true);
+      }}
+      data-testid="show-example"
+    >
+      Example ▸
+    </button>
+  );
+}
+
 export function FlipCard({
   card,
   flipped,
@@ -288,11 +315,7 @@ export function FlipCard({
         </p>
         <AudioButton text={card.definition} lang={card.definitionLang} />
       </div>
-      {card.example && (
-        <p className="text-muted italic" dir={langDir(card.termLang)} lang={card.termLang}>
-          “{card.example}”
-        </p>
-      )}
+      {card.example && <ExampleToggle card={card} />}
     </div>
   );
   return (
@@ -378,11 +401,10 @@ export function Feedback({
   onContinue: () => void;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
-  const speak = useSpeak();
+  // No sound here: the word was already played when the question appeared, and replaying it
+  // after answering would clash with the next word's audio. The 🔊 button replays on demand.
   useEffect(() => {
     btnRef.current?.focus();
-    void speak(card.term, card.termLang, { auto: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useKey((e) => {
     if (e.key === "Enter") {
@@ -427,6 +449,9 @@ export function Feedback({
             <AudioButton text={card.term} lang={card.termLang} size="sm" />
           </p>
           <p className="text-sm text-muted">{card.definition}</p>
+          <div className="mt-1">
+            <ExampleToggle card={card} />
+          </div>
           {outcome.answerGiven && !outcome.correct && (
             <p className="mt-1 text-sm">
               You wrote: <span className="line-through">{outcome.answerGiven}</span>

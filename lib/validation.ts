@@ -5,7 +5,7 @@ import { LANGUAGE_CODES } from "./languages";
 // No `new Function` JIT: keeps the strict Content-Security-Policy (no unsafe-eval) clean.
 z.config({ jitless: true });
 
-export const LIMITS = { decksPerUser: 200, cardsPerDeck: 1000 } as const;
+export const LIMITS = { decksPerUser: 200, cardsPerDeck: 1000, sentencesPerDeck: 500 } as const;
 export const CARD_LIMITS = { term: 200, definition: 500, example: 500 } as const;
 export const MAX_IMAGE_BYTES = 150 * 1024;
 
@@ -86,6 +86,41 @@ export const cardInputSchema = z.object({
 export const cardsPutSchema = z.object({
   cards: z.array(cardInputSchema).max(LIMITS.cardsPerDeck, `A deck can have at most ${LIMITS.cardsPerDeck} cards`),
 });
+
+export const sentenceInputSchema = z.object({
+  id: z.string().uuid().optional(),
+  text: z.string().trim().min(1, "Sentence is required").max(300, "Sentence must be at most 300 characters"),
+  translation: z.string().trim().max(300).default(""),
+  reply: z.string().trim().max(300).nullable().optional(),
+  replyTranslation: z.string().trim().max(300).nullable().optional(),
+});
+
+export const sentencesPutSchema = z.object({
+  sentences: z.array(sentenceInputSchema).max(LIMITS.sentencesPerDeck, `A deck can have at most ${LIMITS.sentencesPerDeck} sentences`),
+});
+
+export const sentenceReviewSchema = z.object({
+  sentenceId: z.string().uuid(),
+  mode: z.enum(["learn", "sentences"]),
+  type: z.enum(["fill_blank", "sentence_read", "word_order", "qa_match"]),
+  correct: z.boolean(),
+  answerGiven: z.string().max(1000).default(""),
+  responseMs: z.number().int().min(0).max(3_600_000).default(0),
+  tz: z.number().int().min(-840).max(840).optional(),
+});
+
+export const generateSentencesSchema = z.object({ count: z.number().int().min(1).max(20) });
+
+export const generatedSentencesSchema = z
+  .array(
+    z.object({
+      text: z.string().trim().min(1).max(300),
+      translation: z.string().trim().max(300).optional().default(""),
+      reply: z.string().trim().max(300).nullable().optional(),
+      replyTranslation: z.string().trim().max(300).nullable().optional(),
+    }),
+  )
+  .max(20);
 
 export const importSchema = z.object({
   text: z.string().max(200_000),
@@ -193,6 +228,8 @@ export const settingsSchema = z.object({
   stepsPerDay: z.number().int().min(1).max(5).default(2),
   newPerDay: z.number().int().min(1).max(100).default(10),
   roundSize: z.number().int().min(5).max(15).default(7),
+  /** Sentence exercises added to the daily Learn session once sentences unlock (0 = none). */
+  sentencesPerDay: z.number().int().min(0).max(20).default(5),
   passMark: z.number().int().min(50).max(100).default(80),
   theme: z.enum(["system", "light", "dark"]).default("system"),
   soundEffects: z.boolean().default(true),

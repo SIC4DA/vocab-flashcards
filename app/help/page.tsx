@@ -9,6 +9,7 @@ const TOC = [
   ["start", "Quick start"],
   ["learned", "When is a word “learned”?"],
   ["daily", "Your daily Learn session"],
+  ["sentences", "Sentences: words in context"],
   ["modes", "Study modes"],
   ["which-modes", "Which modes count towards mastering?"],
   ["reviews", "Reviews, due cards and streaks"],
@@ -189,6 +190,47 @@ export default async function HelpPage() {
         </li>
       </ul>
 
+      <H2 id="sentences">Sentences: words in context</H2>
+      <p>
+        Words stick better when you meet them in real sentences. Add sentences to a deck in the editor (type them, use{" "}
+        <b>📋 Bulk import → Sentences</b>, or <b>✨ Generate sentences</b> with your Gemini key). The app finds which of the
+        deck’s words each sentence uses, even when they’re conjugated (<i>kommen</i> → <i>kommst</i>).
+      </p>
+      <ul className="list-disc space-y-2 pl-6">
+        <li>
+          <b>Unlock:</b> a sentence unlocks once you’ve <b>mastered every deck word in it</b>. It’s a reward for learning the
+          words; the deck page shows which words a locked sentence still needs.
+        </li>
+        <li>
+          <b>Each sentence climbs its own ladder</b> (one correct answer per step, {steps} step{steps === 1 ? "" : "s"} per day):
+          <ol className="mt-1 list-decimal space-y-1 pl-6">
+            <li>
+              <b>Fill in the blank</b>: “Mir geht’s ___ gut.” — pick the missing word.
+            </li>
+            <li>
+              <b>Sentence</b>: hear and read the whole sentence, reveal the translation, and say whether you understood it.
+            </li>
+            <li>
+              <b>Word order</b>: the sentence is scrambled (“du / kommst / woher”) — tap the words in the right order.
+            </li>
+            <li>
+              <b>Question &amp; answer</b> (only for sentences with a reply): match questions like “Wie heißt du?” with replies
+              like “Ich heiße …”.
+            </li>
+          </ol>
+          Then it’s mastered and comes back in spaced reviews (mostly word order and fill-in-the-blank).
+        </li>
+        <li>
+          <b>Part of your daily session:</b> up to <b>{s.sentencesPerDay}</b> sentence exercises are added to the end of each
+          Learn session once sentences unlock (setting “Sentences per day”). The <b>💬 Sentences</b> mode lets you practise
+          more.
+        </li>
+        <li>
+          <b>On word cards</b>, the back shows the meaning and an <b>Example ▸</b> button: the example sentence stays out of
+          the way until you want it. Words without their own example borrow one of the deck’s sentences.
+        </li>
+      </ul>
+
       <H2 id="modes">Study modes</H2>
       <dl className="space-y-3">
         {[
@@ -196,6 +238,7 @@ export default async function HelpPage() {
           ["🃏 Flashcards", "Flip cards (tap, click or Space). Sort them with “Know it” (→) or “Still learning” (←), or swipe on a phone. At the end you can study only the still-learning ones again. Options: shuffle, definition first."],
           ["✍️ Write", "Every word as a writing question in random order. Wrong ones come back at the end."],
           ["🎧 Listen", "Dictation: you only hear the word (🔊 replay, 🐢 slow) and type it."],
+          ["💬 Sentences", "Practise unlocked sentences: fill in the blank, read, word order, question & answer."],
           ["🎯 Match", "Match 6 words with their meanings as fast as you can. Wrong pairs add 1 second. Your best time per deck is saved."],
           ["📝 Test", "A generated exam: choose how many questions and which types (multiple choice, write, listen & write, true/false). You get a score, pass/fail (pass mark in Settings), and can retake only the ones you missed."],
           ["🔁 Review all due", "From the dashboard: practises every word that is due today, across all your decks."],
@@ -380,6 +423,7 @@ export default async function HelpPage() {
           [`New words per day (now ${s.newPerDay})`, "How many new words Learn introduces per day."],
           [`Steps per word per day (now ${steps})`, "How far one word can climb in a day’s Learn session."],
           [`Learn round size (now ${s.roundSize})`, "How many words are in each Learn round."],
+          [`Sentences per day (now ${s.sentencesPerDay})`, "Sentence exercises added to the daily Learn session once sentences unlock."],
           [`Test pass mark (now ${s.passMark}%)`, "The score you need to pass a Test."],
           ["Theme", "Light, dark, or follow your device."],
         ].map(([t, d]) => (

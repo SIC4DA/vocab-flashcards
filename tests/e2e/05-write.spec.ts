@@ -48,3 +48,44 @@ test("write mode: accent-insensitive answer and typo override with 'I was right'
   await page.getByRole("button", { name: "Insert é" }).click();
   await expect(input).toHaveValue("café");
 });
+
+test("no audio is replayed after answering (multiple choice or writing)", async ({ page }) => {
+  await registerAPI(page, uid("Quiet_"));
+  await setSettings(page, { soundEffects: false });
+  const { deckId, cards } = await createDeckAPI(page, WORDS);
+  const spoken = () => page.evaluate(() => (window as unknown as { __tts: unknown[] }).__tts.length);
+  const played = () => page.evaluate(() => (window as unknown as { __played: unknown[] }).__played.length);
+
+  // Writing: submit right and wrong answers — nothing is spoken afterwards
+  await page.goto(`/decks/${deckId}/study/write`);
+  for (const correct of [true, false]) {
+    const word = await currentWord(page, WORDS, cards);
+    const [t0, p0] = [await spoken(), await played()];
+    await page.getByTestId("answer-input").fill(correct ? word.term : "zzzz");
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("feedback")).toBeVisible();
+    await page.waitForTimeout(600);
+    expect(await spoken()).toBe(t0);
+    expect(await played()).toBe(p0);
+    await page.getByTestId("continue").click();
+  }
+
+  // Multiple choice in Learn (fresh deck): the word is heard when the question appears, not again after picking
+  const fresh = await createDeckAPI(page, WORDS);
+  await page.goto(`/decks/${fresh.deckId}`);
+  await page.getByTestId("mode-learn").click();
+  for (let i = 0; i < 6; i++) {
+    await page.getByTestId("got-it").click();
+    await page.getByTestId("got-it").click();
+  }
+  await page.getByTestId("next-round").click();
+  await expect(page.getByTestId("question")).toHaveAttribute("data-type", "mc");
+  await expect.poll(spoken).toBeGreaterThan(0); // auto-play when the card appears
+  await page.waitForTimeout(300);
+  const [t0, p0] = [await spoken(), await played()];
+  await page.getByTestId("mc-option").first().click();
+  await expect(page.getByTestId("feedback")).toBeVisible();
+  await page.waitForTimeout(600);
+  expect(await spoken()).toBe(t0);
+  expect(await played()).toBe(p0);
+});

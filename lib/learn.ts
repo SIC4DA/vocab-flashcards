@@ -72,6 +72,8 @@ export type StudyCard = {
   imageAttribution: string | null;
   /** Topic group suggested by AI (null without a Gemini key). */
   group?: string | null;
+  /** Translation of the example (when the example comes from one of the deck's sentences). */
+  exampleTranslation?: string;
   termLang: string;
   definitionLang: string;
   progress: Progress;
@@ -99,7 +101,7 @@ export type LadderOptions = {
 /** After this many mistakes on one word in a day, it rests until tomorrow. */
 export const MAX_WRONG_PER_DAY = 3;
 
-function dayCounters(p: Progress, today: string | undefined) {
+export function dayCounters(p: Progress, today: string | undefined) {
   const same = Boolean(today) && p.dayKey === today;
   return {
     dayKey: today ?? p.dayKey ?? null,
@@ -259,7 +261,7 @@ export type AnswerInput = {
 
 export type AnswerResult = { progress: Progress; previousStage: number; stageChanged: -1 | 0 | 1 };
 
-function bumpStats(stats: ModeStats, key: string, correct: boolean): ModeStats {
+export function bumpStats(stats: ModeStats, key: string, correct: boolean): ModeStats {
   const cur = stats[key] ?? { correct: 0, wrong: 0 };
   return { ...stats, [key]: correct ? { ...cur, correct: cur.correct + 1 } : { ...cur, wrong: cur.wrong + 1 } };
 }
@@ -269,7 +271,7 @@ function nextStageUp(stage: number): number {
   return stage >= 4 ? MAX_STAGE : stage + 1;
 }
 
-function schedule(p: Progress, stageForSchedule: number, grade: Grade, now: Date) {
+export function schedule(p: Progress, stageForSchedule: number, grade: Grade, now: Date) {
   const s: SrsState = { ease: p.ease, intervalDays: p.intervalDays, reps: p.reps, lapses: p.lapses };
   const next = stageForSchedule >= MAX_STAGE ? sm2(s, grade) : learningStep(s, grade);
   return { ...next, dueAt: dueDate(now, next.intervalDays).toISOString() };
@@ -434,7 +436,10 @@ export function topicSummary(topics: Topic[]) {
 /* Daily Learn session                                                */
 /* ------------------------------------------------------------------ */
 
-export type SessionKind = "review" | "learning" | "new";
+export type SessionKind = "review" | "learning" | "new" | "sentence" | "sentence_review";
+
+/** Sentence ladder top (fill-in-the-blank → sentence → word order → Q&A → mastered). */
+export const SENTENCE_MAX_STAGE = 4;
 export type SessionItem = { id: string; kind: SessionKind };
 
 /**
@@ -446,8 +451,8 @@ export type SessionItem = { id: string; kind: SessionKind };
 export function doneToday(p: Progress, kind: SessionKind, today: string, stepsPerDay: number): boolean {
   if (p.dayKey !== today) return false;
   if ((p.dayWrong ?? 0) >= MAX_WRONG_PER_DAY) return true;
-  if (kind === "review") return (p.dayCorrect ?? 0) >= 1;
-  if (p.stage >= MAX_STAGE) return true;
+  if (kind === "review" || kind === "sentence_review") return (p.dayCorrect ?? 0) >= 1;
+  if (p.stage >= (kind === "sentence" ? SENTENCE_MAX_STAGE : MAX_STAGE)) return true;
   return p.stage - (p.dayStartStage ?? p.stage) >= stepsPerDay;
 }
 

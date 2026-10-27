@@ -50,7 +50,8 @@ export function TestRunner({ deckId, cardCount, title, exitHref }: { deckId: str
       });
       if (cardIds) params.set("cardIds", cardIds.join(","));
       const data = await api<QueuePayload>(`/api/study/queue?${params}`);
-      setTest({ questions: data.questions, cards: Object.fromEntries(data.cards.map((c) => [c.id, c])) });
+      // Tests only contain word questions.
+      setTest({ questions: data.questions.filter((q): q is Question => "cardId" in q), cards: Object.fromEntries(data.cards.map((c) => [c.id, c])) });
       setAnswers({});
       setResults(null);
       window.scrollTo({ top: 0 });

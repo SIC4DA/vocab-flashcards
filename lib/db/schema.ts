@@ -131,6 +131,50 @@ export const cardProgress = pgTable(
   (t) => [index("card_progress_due_at_idx").on(t.dueAt)],
 );
 
+/** Example / practice sentences of a deck (optionally a question with its reply). */
+export const sentences = pgTable(
+  "sentences",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    deckId: uuid("deck_id")
+      .notNull()
+      .references(() => decks.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    text: text("text").notNull(),
+    translation: text("translation").notNull().default(""),
+    /** For question-and-answer pairs: the reply sentence ("Wie heißt du?" → "Ich heiße Anna."). */
+    reply: text("reply"),
+    replyTranslation: text("reply_translation"),
+    /** Deck words found in the sentence (recomputed when cards or sentences change). */
+    cardIds: jsonb("card_ids").$type<string[]>().notNull().default([]),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("sentences_deck_position_idx").on(t.deckId, t.position)],
+);
+
+/** Learning progress of a sentence (same shape as card progress; ladder stages 0–4). */
+export const sentenceProgress = pgTable("sentence_progress", {
+  sentenceId: uuid("sentence_id")
+    .primaryKey()
+    .references(() => sentences.id, { onDelete: "cascade" }),
+  stage: integer("stage").notNull().default(0),
+  ease: real("ease").notNull().default(2.5),
+  intervalDays: real("interval_days").notNull().default(0),
+  dueAt: timestamp("due_at", { withTimezone: true }).notNull().defaultNow(),
+  reps: integer("reps").notNull().default(0),
+  lapses: integer("lapses").notNull().default(0),
+  correctStreak: integer("correct_streak").notNull().default(0),
+  lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
+  modeStats: jsonb("mode_stats").$type<ModeStats>().notNull().default({}),
+  dayKey: text("day_key"),
+  dayStartStage: integer("day_start_stage").notNull().default(0),
+  dayWrong: integer("day_wrong").notNull().default(0),
+  dayCorrect: integer("day_correct").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 export const reviewLog = pgTable(
   "review_log",
   {
