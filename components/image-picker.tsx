@@ -54,7 +54,7 @@ export function ImagePicker({
       aria-labelledby="picker-title"
     >
       <div className="flex items-center justify-between">
-        <h2 id="picker-title" className="text-lg font-bold">
+        <h2 id="picker-title" className="text-xl font-semibold">
           Choose an image
         </h2>
         <button type="button" className="btn-icon" aria-label="Close" onClick={() => ref.current?.close()}>

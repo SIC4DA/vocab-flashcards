@@ -22,7 +22,7 @@ test("create a Spanish→English deck with auto images, then bulk-import 4 more"
   }
 
   // Auto-fill suggests a definition (mocked MyMemory)
-  await page.getByRole("button", { name: "＋ Add card" }).click();
+  await page.getByRole("button", { name: "Add card" }).click();
   await rows.nth(6).getByLabel("Term", { exact: true }).fill("la mesa");
   await rows.nth(6).getByRole("button", { name: /Auto-fill definition/ }).click();
   await expect(rows.nth(6).getByLabel("Definition", { exact: true })).toHaveValue("meaning of la mesa");

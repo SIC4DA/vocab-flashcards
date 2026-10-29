@@ -25,6 +25,7 @@ import {
 } from "@/lib/learn";
 import { prefetchPronunciation, stopSpeaking } from "@/lib/tts";
 import { useApp, useConfirm } from "../providers";
+import { CloseIcon } from "../icons";
 import { Confetti, ProgressBar } from "../ui";
 import {
   Feedback,
@@ -121,9 +122,9 @@ export function SessionHeader({ title, exitHref, children }: { title: string; ex
   return (
     <div className="mb-4 flex items-center gap-3">
       <Link href={exitHref} className="btn-icon" aria-label="Exit session (Esc)">
-        ✕
+        <CloseIcon size={20} />
       </Link>
-      <h1 className="truncate text-lg font-bold">{title}</h1>
+      <h1 className="truncate text-xl font-semibold">{title}</h1>
       <div className="ml-auto flex items-center gap-2">{children}</div>
     </div>
   );
@@ -412,8 +413,8 @@ export function StudySession({
     return (
       <div className="mx-auto max-w-2xl">
         <SessionHeader title={title} exitHref={exitHref} />
-        <div className="panel animate-pop p-6" data-testid="round-summary">
-          <h2 className="text-2xl font-extrabold">Round complete!</h2>
+        <div className="index-card animate-pop px-6 pb-6 pt-3 sm:px-8" data-testid="round-summary">
+          <h2 className="text-[1.6rem] font-semibold leading-[44px]">Round complete!</h2>
           {session && (
             <div className="mt-3">
               <ProgressBar value={sessionDone} max={sessionTotal} label="Words done for today" />
@@ -425,7 +426,7 @@ export function StudySession({
           </p>
           {movedUp.length > 0 && (
             <>
-              <h3 className="mt-4 font-bold text-success">Moved up a stage</h3>
+              <h3 className="mt-4 font-semibold text-success">Moved up a stage</h3>
               <ul className="mt-1 space-y-1">
                 {Array.from(new Map(movedUp.map((e) => [e.cardId, e])).values()).map((e) => (
                   <li key={e.cardId} className="flex justify-between gap-2">
@@ -442,7 +443,7 @@ export function StudySession({
           )}
           {mistakes.length > 0 && (
             <>
-              <h3 className="mt-4 font-bold text-danger">Mistakes</h3>
+              <h3 className="mt-4 font-semibold text-danger">Mistakes</h3>
               <ul className="mt-1 space-y-1">
                 {mistakes.map((id) => (
                   <li key={id}>
@@ -491,7 +492,7 @@ export function StudySession({
         <div className="sr-only" aria-live="assertive">
           {announce}
         </div>
-        <div className="panel mt-4 p-4 sm:p-6" data-testid="question" data-type={sentenceQ.type} data-sentence-id={sentence.id} key={sentenceQ.key}>
+        <div className="index-card mt-5 px-4 pb-6 pt-4 sm:px-8" data-testid="question" data-type={sentenceQ.type} data-sentence-id={sentence.id} key={sentenceQ.key}>
           {sentenceQ.type === "fill_blank" ? (
             <FillBlankQuestion {...sProps} />
           ) : sentenceQ.type === "sentence_read" ? (
@@ -539,7 +540,13 @@ export function StudySession({
       <div className="sr-only" aria-live="assertive">
         {announce}
       </div>
-      <div className="panel mt-4 p-4 sm:p-6" data-testid="question" data-type={wordQ.type} data-card-id={card.id} key={wordQ.key}>
+      <div
+        className={wordQ.type === "flashcard" ? "mt-5" : "index-card mt-5 px-4 pb-6 pt-4 sm:px-8"}
+        data-testid="question"
+        data-type={wordQ.type}
+        data-card-id={card.id}
+        key={wordQ.key}
+      >
         {wordQ.type === "flashcard" ? (
           <NewCardQuestion {...qProps} />
         ) : wordQ.type === "mc" || wordQ.type === "mc_reverse" || wordQ.type === "listen_mc" ? (
@@ -608,11 +615,20 @@ function Celebration({
   return (
     <div className="mx-auto max-w-xl text-center">
       {!empty && <Confetti />}
-      <div className="panel animate-pop mt-6 p-8" data-testid="session-done">
-        <div aria-hidden className="text-6xl">
-          {empty ? "✨" : "🎉"}
-        </div>
-        <h1 className="mt-2 text-3xl font-black">
+      <div className="index-card animate-pop mt-6 px-6 pb-8 pt-3 sm:px-10" data-testid="session-done">
+        {!empty && (
+          <div
+            aria-hidden
+            className="mx-auto mt-5 grid h-20 w-20 -rotate-6 place-items-center rounded-full border-[3px] border-margin font-display text-sm font-bold leading-tight text-margin opacity-90"
+          >
+            <span>
+              Well
+              <br />
+              done
+            </span>
+          </div>
+        )}
+        <h1 className="mt-4 text-[2rem] font-semibold">
           {daily ? (empty ? "All done for today" : "Done for today!") : "Session complete!"}
         </h1>
         <p className="mt-2 text-muted">
@@ -625,16 +641,16 @@ function Celebration({
             : `${totals.correct} of ${total} answers correct${total ? ` (${Math.round((totals.correct / total) * 100)}%)` : ""}.`}
         </p>
         {daily && !empty && (
-          <ul className="mx-auto mt-4 max-w-xs space-y-1 text-left text-sm" data-testid="day-stats">
-            {mode !== "sentences" && <li>📚 {practised} words practised</li>}
-            {sentencesPractised > 0 && <li>💬 {sentencesPractised} sentences practised</li>}
-            {sentencesMastered > 0 && <li>🌟 {sentencesMastered} sentences mastered</li>}
-            <li>⬆️ {steppedUp} words moved up</li>
-            <li>🏆 {masteredToday} words mastered today</li>
+          <ul className="mx-auto mt-4 max-w-xs text-left text-[0.95rem] leading-8" data-testid="day-stats">
+            {mode !== "sentences" && <li>{practised} words practised</li>}
+            {sentencesPractised > 0 && <li>{sentencesPractised} sentences practised</li>}
+            {sentencesMastered > 0 && <li>{sentencesMastered} sentences mastered</li>}
+            <li>{steppedUp} words moved up</li>
+            <li>{masteredToday} words mastered today</li>
           </ul>
         )}
         {finishedTopic && (
-          <p className="mt-4 rounded-xl bg-success-soft px-4 py-2 font-semibold text-success" data-testid="topic-finished">
+          <p className="mt-4 border-l-4 border-success bg-success-soft px-4 py-2 text-left font-semibold text-success" data-testid="topic-finished">
             Topic “{finishedTopic}” complete!{topicNow ? ` Next topic: “${topicNow}”.` : ""}
           </p>
         )}

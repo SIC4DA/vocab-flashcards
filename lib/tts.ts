@@ -49,6 +49,7 @@ export function prefetchPronunciation(text: string, lang: string) {
     if (r.url) {
       const a = new Audio();
       a.preload = "auto";
+      a.crossOrigin = "anonymous";
       a.src = r.url;
     }
   });
@@ -56,7 +57,10 @@ export function prefetchPronunciation(text: string, lang: string) {
 
 function playUrl(url: string, rate: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const audio = new Audio(url);
+    const audio = new Audio();
+    // Recordings come from Wikimedia: fetch them anonymously so no third-party cookies are set.
+    audio.crossOrigin = "anonymous";
+    audio.src = url;
     audio.playbackRate = rate;
     currentAudio = audio;
     let settled = false;

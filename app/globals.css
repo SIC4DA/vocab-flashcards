@@ -1,67 +1,84 @@
 @import "tailwindcss";
 
-/* Design tokens. One accent colour; WCAG AA contrast in both themes. */
+/*
+ * "Study desk" design tokens: cool notebook paper, index cards, royal-blue fountain-pen ink,
+ * the teacher's red pen for corrections, a green tick, and highlighter yellow for what's due.
+ * Token names are shared by every component; WCAG AA contrast in both themes.
+ */
 :root {
-  --bg: #f5f6fb;
-  --surface: #ffffff;
-  --surface-2: #eef0f7;
-  --fg: #1b1d2a;
-  --muted: #555a72;
-  --line: #d9dceb;
-  --accent: #4255d4;
-  --accent-strong: #3343b5;
-  --accent-soft: #e6e9fc;
+  --bg: #f2f4f7; /* notebook paper */
+  --grid: #e7ebf1; /* squared-paper lines */
+  --surface: #ffffff; /* a sheet / an index card */
+  --surface-2: #eaeef4; /* pencil-shaded area */
+  --fg: #1a2133; /* blue-black ink */
+  --muted: #586276;
+  --line: #d3dae5; /* hairline rule */
+  --rule: #cfdcef; /* index-card ruled lines */
+  --accent: #2442c4; /* royal-blue ink */
+  --accent-strong: #1a33a0;
+  --accent-soft: #e5eafb;
   --on-accent: #ffffff;
-  --success: #17803d;
-  --success-soft: #e3f6ea;
-  --danger: #c22a2a;
-  --danger-soft: #fde8e8;
-  --warning: #8a5a00;
-  --warning-soft: #fff3d6;
-  --shadow: 0 1px 2px rgb(20 24 60 / 0.06), 0 4px 16px rgb(20 24 60 / 0.06);
+  --margin: #c3352b; /* index-card header line / correction red */
+  --success: #1e7348;
+  --success-soft: #e2f2e8;
+  --danger: #c3352b;
+  --danger-soft: #fbe7e4;
+  --warning: #5f4b00;
+  --warning-soft: #ffe97a; /* highlighter */
+  --shadow: 0 1px 0 rgb(26 33 51 / 0.04), 0 1px 2px rgb(26 33 51 / 0.06);
+  --shadow-lift: 0 1px 1px rgb(26 33 51 / 0.06), 0 14px 32px -16px rgb(26 33 51 / 0.35);
   color-scheme: light;
 }
 
+/* Night desk: deep ink-blue paper, not black. */
 :root[data-theme="dark"] {
-  --bg: #11131c;
-  --surface: #1b1e2b;
-  --surface-2: #252937;
-  --fg: #eef0f8;
-  --muted: #a8adc4;
-  --line: #343a4f;
-  --accent: #8b98ff;
-  --accent-strong: #a6b0ff;
-  --accent-soft: #272d55;
-  --on-accent: #0d1030;
-  --success: #5ad48a;
-  --success-soft: #173326;
-  --danger: #ff8a8a;
-  --danger-soft: #3d1c20;
-  --warning: #ffc861;
-  --warning-soft: #3a2e12;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
+  --bg: #121a2c;
+  --grid: #19223a;
+  --surface: #1b2439;
+  --surface-2: #232e47;
+  --fg: #e9edf6;
+  --muted: #a3adc4;
+  --line: #2f3a55;
+  --rule: #2a3654;
+  --accent: #93a8ff;
+  --accent-strong: #b3c2ff;
+  --accent-soft: #263463;
+  --on-accent: #0d1430;
+  --margin: #ff8278;
+  --success: #6fd49b;
+  --success-soft: #173a2b;
+  --danger: #ff8278;
+  --danger-soft: #42222a;
+  --warning: #ffe27a;
+  --warning-soft: #3b3416;
+  --shadow: 0 1px 0 rgb(0 0 0 / 0.25);
+  --shadow-lift: 0 1px 1px rgb(0 0 0 / 0.3), 0 16px 36px -16px rgb(0 0 0 / 0.6);
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
-    --bg: #11131c;
-    --surface: #1b1e2b;
-    --surface-2: #252937;
-    --fg: #eef0f8;
-    --muted: #a8adc4;
-    --line: #343a4f;
-    --accent: #8b98ff;
-    --accent-strong: #a6b0ff;
-    --accent-soft: #272d55;
-    --on-accent: #0d1030;
-    --success: #5ad48a;
-    --success-soft: #173326;
-    --danger: #ff8a8a;
-    --danger-soft: #3d1c20;
-    --warning: #ffc861;
-    --warning-soft: #3a2e12;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.25);
+    --bg: #121a2c;
+    --grid: #19223a;
+    --surface: #1b2439;
+    --surface-2: #232e47;
+    --fg: #e9edf6;
+    --muted: #a3adc4;
+    --line: #2f3a55;
+    --rule: #2a3654;
+    --accent: #93a8ff;
+    --accent-strong: #b3c2ff;
+    --accent-soft: #263463;
+    --on-accent: #0d1430;
+    --margin: #ff8278;
+    --success: #6fd49b;
+    --success-soft: #173a2b;
+    --danger: #ff8278;
+    --danger-soft: #42222a;
+    --warning: #ffe27a;
+    --warning-soft: #3b3416;
+    --shadow: 0 1px 0 rgb(0 0 0 / 0.25);
+    --shadow-lift: 0 1px 1px rgb(0 0 0 / 0.3), 0 16px 36px -16px rgb(0 0 0 / 0.6);
     color-scheme: dark;
   }
 }
@@ -73,10 +90,12 @@
   --color-fg: var(--fg);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-rule: var(--rule);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-accent-soft: var(--accent-soft);
   --color-on-accent: var(--on-accent);
+  --color-margin: var(--margin);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-danger: var(--danger);
@@ -84,37 +103,61 @@
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
   --font-sans:
-    system-ui, -apple-system, "Segoe UI", Roboto, var(--font-noto), var(--font-noto-arabic), var(--font-noto-hebrew),
-    "Noto Sans", "Noto Sans CJK SC", "Noto Sans JP", "Noto Sans KR", "Noto Sans Thai", "Noto Sans Devanagari",
-    "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+    var(--font-ui), system-ui, -apple-system, "Segoe UI", Roboto, var(--font-noto), var(--font-noto-arabic),
+    var(--font-noto-hebrew), "Noto Sans", "Noto Sans CJK SC", "Noto Sans JP", "Noto Sans KR", "Noto Sans Thai",
+    "Noto Sans Devanagari", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  /* Headwords, deck titles and headings: a reading serif with dictionary character. */
+  --font-display:
+    var(--font-headword), "Iowan Old Style", Georgia, var(--font-noto), var(--font-noto-arabic), var(--font-noto-hebrew),
+    "Noto Serif", "Noto Serif CJK SC", serif;
   --shadow-card: var(--shadow);
+  --shadow-lift: var(--shadow-lift);
 }
 
 html,
 body {
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--fg);
 }
 
+/* Squared notebook paper (5 mm grid), very faint. */
 body {
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-attachment: fixed;
+  font-feature-settings: "ss01", "cv11";
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 :focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--warning-soft);
+  color: var(--fg);
 }
 
 /* ---------- Flashcard flip ---------- */
 .flip-scene {
-  perspective: 1200px;
+  perspective: 1400px;
 }
 .flip-card {
   position: relative;
   transform-style: preserve-3d;
-  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .flip-card.is-flipped {
   transform: rotateY(180deg);
@@ -132,11 +175,11 @@ body {
 /* ---------- Feedback animations ---------- */
 @keyframes pop-in {
   from {
-    transform: scale(0.96);
+    transform: translateY(4px);
     opacity: 0;
   }
   to {
-    transform: scale(1);
+    transform: none;
     opacity: 1;
   }
 }
@@ -175,7 +218,7 @@ body {
   }
 }
 .animate-pop {
-  animation: pop-in 0.22s ease-out both;
+  animation: pop-in 0.2s ease-out both;
 }
 .animate-shake {
   animation: shake 0.45s ease-in-out both;
@@ -184,7 +227,7 @@ body {
   position: relative;
   overflow: hidden;
   background: var(--surface-2);
-  border-radius: 12px;
+  border-radius: 6px;
 }
 .skeleton::after {
   content: "";
@@ -197,9 +240,9 @@ body {
 .confetti-piece {
   position: fixed;
   top: 0;
-  width: 10px;
-  height: 14px;
-  border-radius: 2px;
+  width: 8px;
+  height: 12px;
+  border-radius: 1px;
   animation: confetti-fall 2.6s ease-in forwards;
   pointer-events: none;
 }
@@ -228,35 +271,64 @@ body {
 
 /* ---------- Component utilities ---------- */
 @utility btn {
-  @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2 text-base font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2 text-[0.95rem] font-semibold tracking-[0.005em] transition-[background-color,border-color,color,box-shadow] duration-150 disabled:cursor-not-allowed disabled:opacity-45;
 }
+/* Ink-blue primary with a pressed-ink bottom edge. */
 @utility btn-primary {
-  @apply btn bg-accent text-on-accent hover:bg-accent-strong;
+  @apply btn bg-accent text-on-accent shadow-[inset_0_-2px_0_rgb(0_0_0/0.18)] hover:bg-accent-strong;
 }
 @utility btn-secondary {
-  @apply btn border border-line bg-surface text-fg hover:bg-surface-2;
+  @apply btn border border-line bg-surface text-fg hover:border-accent hover:text-accent;
 }
 @utility btn-ghost {
   @apply btn text-fg hover:bg-surface-2;
 }
 @utility btn-danger {
-  @apply btn bg-danger text-white hover:opacity-90;
+  @apply btn bg-danger text-white shadow-[inset_0_-2px_0_rgb(0_0_0/0.18)] hover:opacity-90;
 }
 @utility btn-icon {
-  @apply inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-full text-lg transition-colors hover:bg-surface-2 disabled:opacity-40;
+  @apply inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-lg text-lg text-muted transition-colors hover:bg-surface-2 hover:text-accent disabled:opacity-40;
 }
 @utility input {
-  @apply min-h-11 w-full rounded-xl border border-line bg-surface px-3 py-2 text-base text-fg placeholder:text-muted focus:border-accent focus:outline-none;
+  @apply min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-base text-fg shadow-[inset_0_1px_0_rgb(26_33_51/0.03)] placeholder:text-muted/80 focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none;
 }
 @utility label {
-  @apply mb-1 block text-sm font-semibold text-fg;
+  @apply mb-1.5 block text-sm font-semibold text-fg;
 }
+/* A flat sheet of paper: hairline edge, barely any shadow. */
 @utility panel {
-  @apply rounded-2xl border border-line bg-surface shadow-card;
+  @apply rounded-[10px] border border-line bg-surface shadow-card;
+}
+/* An index card: red header rule, resting on the desk. */
+@utility index-card {
+  @apply rounded-md bg-surface shadow-lift;
+  border-top: 3px solid var(--margin);
+}
+/* Pale-blue ruled lines (32px apart, the first 44px from the top) for cards whose text sits on the lines. */
+@utility ruled {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    var(--rule) 31px,
+    var(--rule) 32px
+  );
+  background-position: 0 12px;
 }
 @utility field-error {
   @apply mt-1 text-sm font-medium text-danger;
 }
+/* Small factual tags: square-ish, not pills. */
 @utility chip {
-  @apply inline-flex items-center gap-1 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-semibold text-muted;
+  @apply inline-flex items-center gap-1 rounded-[5px] border border-line bg-surface px-2 py-0.5 text-xs font-semibold text-muted;
+}
+/* Highlighter stroke for "due" items. */
+@utility highlight {
+  @apply rounded-[3px] px-1.5 py-0.5 font-semibold text-warning;
+  background: linear-gradient(100deg, transparent 2%, var(--warning-soft) 4%, var(--warning-soft) 96%, transparent 98%);
+}
+@utility headword {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.015em;
 }

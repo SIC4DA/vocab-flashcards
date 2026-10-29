@@ -83,7 +83,7 @@ export const test = base.extend<Fixtures & { allowList: RegExp[] }>({
     );
     // Native-speaker recordings (Wikimedia) are served from a local fixture.
     await page.route("https://upload.wikimedia.org/**", (route) =>
-      route.fulfill({ status: 200, contentType: "audio/wav", body: WAV }),
+      route.fulfill({ status: 200, contentType: "audio/wav", body: WAV, headers: { "Access-Control-Allow-Origin": "*" } }),
     );
     await provide(page);
   },
@@ -100,6 +100,8 @@ export async function registerUI(page: Page, username: string, password = "passw
   await page.getByLabel("Confirm password").fill(password);
   await page.getByRole("button", { name: "Sign up" }).click();
   await expect(page.getByRole("heading", { name: "Your decks" })).toBeVisible();
+  // The streak is filled in by the client after hydration, so the page is interactive from here on.
+  await expect(page.getByTestId("streak")).not.toContainText("–");
 }
 
 /** Register via the API (shares cookies with the page). */

@@ -131,9 +131,9 @@ export function MatchGame({
         </span>
       </SessionHeader>
       {finalMs !== null ? (
-        <div className="panel animate-pop p-8 text-center" data-testid="match-done">
+        <div className="index-card animate-pop px-8 pb-8 pt-4 text-center" data-testid="match-done">
           {best.isBest && <Confetti />}
-          <h2 className="text-3xl font-black">{(finalMs / 1000).toFixed(1)} s</h2>
+          <h2 className="headword text-[2.6rem] tabular-nums">{(finalMs / 1000).toFixed(1)} s</h2>
           <p className="mt-2 text-muted" data-testid="match-best">
             {best.isBest ? "🏆 New best time!" : `Best: ${best.ms ? (best.ms / 1000).toFixed(1) : "–"} s`}
           </p>
@@ -160,7 +160,7 @@ export function MatchGame({
                     data-testid="match-tile"
                     data-card-id={t.cardId}
                     data-kind={t.kind}
-                    className={`flex h-28 w-full flex-col items-center justify-center gap-1 rounded-xl border-2 p-2 text-center text-sm font-semibold transition-all sm:h-32 sm:text-base ${
+                    className={`flex h-28 w-full flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center text-sm font-semibold transition-all sm:h-32 sm:text-base ${
                       isMatched
                         ? "invisible scale-90 opacity-0"
                         : isWrong

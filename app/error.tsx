@@ -4,11 +4,8 @@ import Link from "next/link";
 
 export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <div className="mx-auto mt-12 max-w-md text-center" role="alert">
-      <p aria-hidden className="text-6xl">
-        😵
-      </p>
-      <h1 className="mt-4 text-3xl font-black">Something went wrong</h1>
+    <div className="index-card mx-auto mt-12 max-w-md px-8 pb-8 pt-6 text-center" role="alert">
+      <h1 className="text-3xl font-semibold">Something went wrong</h1>
       <p className="mt-2 text-muted">An unexpected error happened. Your progress is saved after every answer.</p>
       <div className="mt-6 flex justify-center gap-3">
         <button type="button" className="btn-primary" onClick={reset}>

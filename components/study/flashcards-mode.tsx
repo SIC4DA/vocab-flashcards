@@ -108,8 +108,8 @@ export function FlashcardsMode({ cards, title, exitHref }: { cards: StudyCard[];
     return (
       <div className="mx-auto max-w-xl">
         <SessionHeader title={title} exitHref={exitHref} />
-        <div className="panel animate-pop p-6 text-center" data-testid="flashcards-summary">
-          <h2 className="text-2xl font-extrabold">Round finished</h2>
+        <div className="index-card animate-pop px-6 pb-6 pt-3 text-center" data-testid="flashcards-summary">
+          <h2 className="text-[1.6rem] font-semibold leading-[44px]">Round finished</h2>
           <p className="mt-2 text-muted">
             <b className="text-success">{known}</b> known · <b className="text-warning">{stillLearning.length}</b> still learning
           </p>
@@ -179,10 +179,10 @@ export function FlashcardsMode({ cards, title, exitHref }: { cards: StudyCard[];
       </div>
       <p className="mt-2 text-center text-xs text-muted">Tap to flip · swipe or use ← / → to sort</p>
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <button type="button" className="btn-secondary border-warning text-warning" onClick={() => mark(false)} data-testid="still-learning">
+        <button type="button" className="btn-secondary" onClick={() => mark(false)} data-testid="still-learning">
           ← Still learning
         </button>
-        <button type="button" className="btn-secondary border-success text-success" onClick={() => mark(true)} data-testid="know-it">
+        <button type="button" className="btn-secondary text-success hover:text-success" onClick={() => mark(true)} data-testid="know-it">
           Know it →
         </button>
       </div>

@@ -12,6 +12,7 @@ import { parseSentenceImport, type ParsedSentence } from "@/lib/sentences";
 import { langDir } from "@/lib/languages";
 import { cardInputSchema, deckInputSchema, LIMITS, zodFieldErrors } from "@/lib/validation";
 import { AudioButton } from "./audio";
+import { ArrowDownIcon, ArrowUpIcon, GripIcon, TrashIcon } from "./icons";
 import { CardImage } from "./card-image";
 import { ImagePicker } from "./image-picker";
 import { useApp, useToast } from "./providers";
@@ -431,7 +432,7 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-2xl font-extrabold">{deck ? "Edit deck" : "Create a new deck"}</h1>
+        <h1 className="mr-auto text-2xl font-semibold">{deck ? "Edit deck" : "Create a new deck"}</h1>
         {deck && (
           <a className="btn-secondary" href={`/api/decks/${deck.id}/export.csv`} download>
             Export CSV
@@ -505,7 +506,7 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
 
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn-secondary" onClick={() => setShowImport((v) => !v)} aria-expanded={showImport}>
-          📋 Bulk import
+          Bulk import
         </button>
         {gemini ? (
           <button
@@ -515,11 +516,11 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
             aria-expanded={showGenerate}
             data-testid="generate-toggle"
           >
-            ✨ Generate deck
+            Generate deck
           </button>
         ) : (
           <Link href="/settings" className="btn-ghost text-sm text-muted" data-testid="generate-hint">
-            ✨ Want AI-generated decks? Add your free Gemini key in Settings
+            Want AI-generated decks? Add your free Gemini key in Settings
           </Link>
         )}
       </div>
@@ -562,7 +563,7 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
       )}
 
       <section aria-label="Cards" className="space-y-3">
-        <h2 className="text-lg font-bold">
+        <h2 className="text-xl font-semibold">
           Cards <span className="text-sm font-semibold text-muted">({cardCount})</span>
         </h2>
         {errors._cards && <p className="field-error">{errors._cards}</p>}
@@ -593,11 +594,11 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
                       e.dataTransfer.setData("text/plain", row.key);
                     }}
                     onDragEnd={() => setDragKey(null)}
-                    className="hidden cursor-grab select-none px-2 text-xl text-muted sm:inline"
+                    className="hidden cursor-grab select-none px-1 text-muted sm:inline"
                     aria-hidden
                     title="Drag to reorder"
                   >
-                    ⠿
+                    <GripIcon size={18} />
                   </span>
                   <span className="mr-auto text-sm font-bold text-muted">{index + 1}</span>
                   <button
@@ -607,7 +608,7 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
                     disabled={index === 0}
                     aria-label={`Move card ${index + 1} up`}
                   >
-                    ↑
+                    <ArrowUpIcon size={18} />
                   </button>
                   <button
                     type="button"
@@ -616,7 +617,7 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
                     disabled={isLast}
                     aria-label={`Move card ${index + 1} down`}
                   >
-                    ↓
+                    <ArrowDownIcon size={18} />
                   </button>
                   <button
                     type="button"
@@ -624,7 +625,7 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
                     onClick={() => removeRow(row.key)}
                     aria-label={`Delete card ${index + 1}`}
                   >
-                    🗑️
+                    <TrashIcon size={18} />
                   </button>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-[1fr_1fr_7rem]">
@@ -679,7 +680,7 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
                       onClick={() => autoFill(row)}
                       disabled={autoFilling.has(row.key)}
                     >
-                      {autoFilling.has(row.key) ? "Suggesting…" : "✨ Auto-fill definition"}
+                      {autoFilling.has(row.key) ? "Suggesting…" : "Auto-fill definition"}
                     </button>
                     {err("definition") && <p className="field-error">{err("definition")}</p>}
                   </div>
@@ -717,7 +718,7 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
           })}
         </ol>
         <button type="button" className="btn-secondary w-full border-dashed" onClick={() => addRow()}>
-          ＋ Add card
+          Add card
         </button>
       </section>
 
@@ -877,7 +878,7 @@ function BulkImport({
   if (kind === "sentences") {
     return (
       <section className="panel space-y-3 p-5" aria-label="Bulk import">
-        <h2 className="font-bold">Bulk import</h2>
+        <h2 className="font-semibold">Bulk import</h2>
         {tabs}
         <SentenceImport onAdd={onAddSentences} />
       </section>
@@ -885,7 +886,7 @@ function BulkImport({
   }
   return (
     <section className="panel space-y-3 p-5" aria-label="Bulk import">
-      <h2 className="font-bold">Bulk import</h2>
+      <h2 className="font-semibold">Bulk import</h2>
       {tabs}
       <p className="text-sm text-muted">
         One card per line: <code>term</code> then a tab, a comma, or <code> - </code> then the <code>definition</code>.
@@ -989,7 +990,7 @@ function GeneratePanel({
   }
   return (
     <form className="panel space-y-3 p-5" onSubmit={generate} aria-label="Generate deck">
-      <h2 className="font-bold">✨ Generate cards with AI</h2>
+      <h2 className="font-semibold">Generate cards with AI</h2>
       <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
         <div>
           <label htmlFor="gen-topic" className="label">
@@ -1121,8 +1122,8 @@ function SentencesEditor({
   return (
     <section aria-labelledby="sentences-h" className="space-y-3" data-testid="sentences-editor">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 id="sentences-h" className="mr-auto text-lg font-bold">
-          💬 Sentences <span className="text-sm font-semibold text-muted">({rows.filter((r) => r.text.trim()).length}, optional)</span>
+        <h2 id="sentences-h" className="mr-auto text-xl font-semibold">
+          Sentences <span className="text-sm font-semibold text-muted">({rows.filter((r) => r.text.trim()).length}, optional)</span>
         </h2>
         {gemini && (
           <button
@@ -1133,7 +1134,7 @@ function SentencesEditor({
             title={!deckId ? "Save the deck first" : undefined}
             data-testid="generate-sentences"
           >
-            {busy ? "Generating…" : "✨ Generate sentences"}
+            {busy ? "Generating…" : "Generate sentences"}
           </button>
         )}
       </div>
@@ -1159,7 +1160,7 @@ function SentencesEditor({
                   aria-label={`Delete sentence ${i + 1}`}
                   onClick={() => onChange((rs) => rs.filter((x) => x.key !== r.key))}
                 >
-                  🗑️
+                  <TrashIcon size={18} />
                 </button>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -1192,7 +1193,7 @@ function SentencesEditor({
                   </>
                 ) : (
                   <button type="button" className="text-left text-sm font-semibold text-accent hover:underline" onClick={() => update(r.key, { reply: "" })}>
-                    ＋ Add a reply (question &amp; answer)
+                    Add a reply (question &amp; answer)
                   </button>
                 )}
               </div>
@@ -1201,7 +1202,7 @@ function SentencesEditor({
         })}
       </ol>
       <button type="button" className="btn-secondary w-full border-dashed" onClick={() => onChange((rs) => [...rs, sentenceRow()])}>
-        ＋ Add sentence
+        Add sentence
       </button>
     </section>
   );

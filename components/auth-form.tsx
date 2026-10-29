@@ -44,8 +44,8 @@ export function AuthForm({ mode, next, signups }: { mode: "login" | "register"; 
 
   if (isRegister && !signups) {
     return (
-      <div className="panel mx-auto mt-10 max-w-md p-6 text-center">
-        <h1 className="text-2xl font-bold">Sign-ups are closed</h1>
+      <div className="index-card mx-auto mt-10 max-w-md px-6 pb-8 pt-5 text-center">
+        <h1 className="text-2xl font-semibold">Sign-ups are closed</h1>
         <p className="mt-2 text-muted">The owner of this app has disabled new registrations.</p>
         <Link href="/login" className="btn-primary mt-6">
           Log in
@@ -56,8 +56,8 @@ export function AuthForm({ mode, next, signups }: { mode: "login" | "register"; 
 
   return (
     <div className="mx-auto mt-6 max-w-md sm:mt-12">
-      <form onSubmit={submit} noValidate className="panel p-6 sm:p-8" aria-describedby={formError ? "form-error" : undefined}>
-        <h1 className="text-2xl font-extrabold">{isRegister ? "Create your account" : "Welcome back"}</h1>
+      <form onSubmit={submit} noValidate className="index-card px-6 pb-8 pt-5 sm:px-8" aria-describedby={formError ? "form-error" : undefined}>
+        <h1 className="text-[1.9rem] font-semibold">{isRegister ? "Create your account" : "Welcome back"}</h1>
         <p className="mt-1 text-muted">{isRegister ? "Just a username and a password — no email needed." : "Log in to keep learning."}</p>
 
         {formError && (

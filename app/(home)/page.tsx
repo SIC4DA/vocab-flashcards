@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Dashboard } from "@/components/dashboard";
+import { DemoCard } from "@/components/demo-card";
 import { getCurrentUser } from "@/lib/current-user";
 import { listDecks } from "@/lib/data";
 
@@ -11,46 +12,75 @@ export default async function HomePage() {
 }
 
 function Landing() {
-  const features = [
-    ["🃏", "Flashcards with audio", "Flip cards, hear native-like pronunciation, and sort what you know."],
-    ["🧠", "Adaptive Learn mode", "Each word climbs from recognising it to writing it."],
-    ["⏰", "Spaced repetition", "Reviews come back right before you'd forget them."],
-    ["🎧", "Listen and write", "Native-speaker recordings, dictation, and typing with accent help."],
-    ["🖼️", "Automatic images", "Openly licensed pictures are found for every word."],
-    ["🎯", "Match & Test", "Race the clock or take a generated exam."],
+  const steps = [
+    ["See it", "The word, its meaning, a picture, and a native speaker saying it."],
+    ["Pick its meaning", "Multiple choice, from the other words in your deck."],
+    ["Hear it", "Recognise the word by sound alone."],
+    ["Write what you hear", "Dictation, with a bar for ä, ß, é and friends."],
+    ["Write it from its meaning", "No hints. Now it’s yours."],
+    ["Review it later", "It comes back after a day, a week, then longer — right before you’d forget it."],
+  ];
+  const extras = [
+    ["Native recordings", "Real speakers from Wiktionary for most single words, your device’s best voice for the rest."],
+    ["Pictures only where they help", "A photo for a towel or a sausage; none for “to spell”."],
+    ["Sentences", "Unlock a sentence by mastering its words, then fill gaps, order words, and match questions to replies."],
+    ["Match and Test", "Pair words against the clock, or take an exam built from your deck."],
   ];
   return (
-    <div className="py-8 sm:py-14">
-      <section className="text-center">
-        <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
-          Learn vocabulary <span className="text-accent">that sticks</span>
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg text-muted">
-          Build decks of words with pictures and pronunciation, then practise them with flashcards, listening and writing —
-          scheduled by spaced repetition.
-        </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link href="/register" className="btn-primary px-6 text-lg">
-            Get started — it&apos;s free
-          </Link>
-          <Link href="/login" className="btn-secondary px-6 text-lg">
-            Log in
-          </Link>
-          <Link href="/help" className="btn-ghost px-6 text-lg">
-            How it works
-          </Link>
-        </div>
-      </section>
-      <section className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Features">
-        {features.map(([icon, title, text]) => (
-          <div key={title} className="panel p-5">
-            <div aria-hidden className="text-3xl">
-              {icon}
-            </div>
-            <h2 className="mt-2 font-bold">{title}</h2>
-            <p className="mt-1 text-sm text-muted">{text}</p>
+    <div className="space-y-20 pb-10 pt-6 sm:pt-14">
+      <section className="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr]">
+        <div>
+          <h1 className="text-[2.6rem] leading-[1.08] font-semibold tracking-[-0.025em] sm:text-[3.6rem]">
+            A few new words a day, and they stay.
+          </h1>
+          <p className="mt-5 max-w-[34rem] text-lg leading-relaxed text-muted">
+            Make index cards with a word, its meaning and a picture. A short session each day takes every word from first
+            sight to writing it from memory, then brings it back just before you’d forget it.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link href="/register" className="btn-primary px-6">
+              Create a free account
+            </Link>
+            <Link href="/login" className="btn-secondary px-6">
+              Log in
+            </Link>
+            <Link href="/help" className="btn-ghost text-accent">
+              How it works
+            </Link>
           </div>
-        ))}
+        </div>
+        <DemoCard />
+      </section>
+
+      <section aria-labelledby="ladder-h">
+        <h2 id="ladder-h" className="text-[1.75rem] font-semibold">
+          How a word is learned
+        </h2>
+        <ol className="mt-6 grid gap-x-10 border-t border-line sm:grid-cols-2 lg:grid-cols-3">
+          {steps.map(([title, text], i) => (
+            <li key={title} className="border-b border-line py-5">
+              <p className="flex items-baseline gap-3">
+                <span className="font-display text-lg text-margin tabular-nums">{i + 1}</span>
+                <span className="font-display text-lg font-semibold">{title}</span>
+              </p>
+              <p className="mt-1 pl-7 text-[0.95rem] text-muted">{text}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section aria-labelledby="extras-h" className="grid gap-8 lg:grid-cols-[1fr_2fr]">
+        <h2 id="extras-h" className="text-[1.75rem] font-semibold">
+          Also in the box
+        </h2>
+        <dl className="divide-y divide-line border-y border-line">
+          {extras.map(([title, text]) => (
+            <div key={title} className="grid gap-1 py-4 sm:grid-cols-[13rem_1fr]">
+              <dt className="font-semibold">{title}</dt>
+              <dd className="text-muted">{text}</dd>
+            </div>
+          ))}
+        </dl>
       </section>
     </div>
   );

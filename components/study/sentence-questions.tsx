@@ -30,7 +30,7 @@ function useKeys(handler: (e: KeyboardEvent) => void) {
 
 function Heading({ type }: { type: SentenceQuestion["type"] }) {
   return (
-    <p className="text-center text-sm font-semibold uppercase tracking-wide text-accent" data-testid="sentence-heading">
+    <p className="text-center text-sm font-medium text-margin" data-testid="sentence-heading">
       {SENTENCE_LABELS[type]}
     </p>
   );
@@ -72,7 +72,7 @@ export function FillBlankQuestion({ question, sentence, answered, onAnswer }: Pr
           {question.context} →
         </p>
       )}
-      <p className="text-center text-2xl font-bold leading-relaxed sm:text-3xl" dir={langDir(sentence.termLang)} lang={sentence.termLang} data-testid="blanked-sentence">
+      <p className="headword text-center text-[1.9rem] leading-relaxed sm:text-[2.3rem]" dir={langDir(sentence.termLang)} lang={sentence.termLang} data-testid="blanked-sentence">
         {parts[0]}
         <span className={`mx-1 inline-block min-w-16 border-b-4 px-1 ${answered ? (answered.correct ? "border-success text-success" : "border-danger text-danger") : "border-accent"}`}>
           {answered ? question.answer : " "}
@@ -96,7 +96,7 @@ export function FillBlankQuestion({ question, sentence, answered, onAnswer }: Pr
                 onClick={() => choose(opt)}
                 lang={sentence.termLang}
                 data-testid="blank-option"
-                className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-xl border-2 px-4 py-3 text-lg font-semibold ${
+                className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-lg border px-4 py-3 text-lg font-semibold ${
                   state === "correct" ? "border-success bg-success-soft" : state === "wrong" ? "animate-shake border-danger bg-danger-soft" : "border-line bg-surface hover:border-accent"
                 }`}
               >
@@ -127,7 +127,7 @@ export function SentenceReadQuestion({ sentence, answered, onAnswer }: Props) {
     <div className="space-y-4 text-center">
       <Heading type="sentence_read" />
       <div className="flex items-center justify-center gap-2">
-        <p className="text-2xl font-bold sm:text-3xl" dir={langDir(sentence.termLang)} lang={sentence.termLang} data-testid="read-sentence">
+        <p className="headword text-[1.9rem] sm:text-[2.3rem]" dir={langDir(sentence.termLang)} lang={sentence.termLang} data-testid="read-sentence">
           {sentence.text}
         </p>
         <AudioButton text={sentence.text} lang={sentence.termLang} />
@@ -180,7 +180,7 @@ export function WordOrderQuestion({ question, sentence, answered, onAnswer }: Pr
       <p className="text-center text-sm font-semibold text-muted">Tap the words in the right order</p>
       <Translation sentence={sentence} />
       <div
-        className={`flex min-h-16 flex-wrap items-center gap-2 rounded-xl border-2 border-dashed p-3 ${
+        className={`flex min-h-16 flex-wrap items-center gap-2 rounded-lg border border-dashed p-3 ${
           answered ? (answered.correct ? "border-success bg-success-soft" : "border-danger bg-danger-soft") : "border-line"
         }`}
         dir={langDir(sentence.termLang)}
@@ -256,7 +256,7 @@ function QaPickReply({ question, sentence, answered, onAnswer }: Props) {
     <div className="space-y-4">
       <Heading type="qa_match" />
       <div className="flex items-center justify-center gap-2">
-        <p className="text-center text-2xl font-bold" lang={sentence.termLang} dir={langDir(sentence.termLang)} data-testid="qa-prompt">
+        <p className="headword text-center text-[1.8rem]" lang={sentence.termLang} dir={langDir(sentence.termLang)} data-testid="qa-prompt">
           {sentence.text}
         </p>
         <AudioButton text={sentence.text} lang={sentence.termLang} />
@@ -273,7 +273,7 @@ function QaPickReply({ question, sentence, answered, onAnswer }: Props) {
                 disabled={Boolean(answered)}
                 onClick={() => choose(opt)}
                 data-testid="qa-option"
-                className={`flex min-h-14 w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-lg ${
+                className={`flex min-h-14 w-full items-center gap-3 rounded-lg border px-4 py-3 text-left text-lg ${
                   state === "correct" ? "border-success bg-success-soft" : state === "wrong" ? "animate-shake border-danger bg-danger-soft" : "border-line bg-surface hover:border-accent"
                 }`}
               >
@@ -332,7 +332,7 @@ function QaMatchBoard({ question, sentence, answered, onAnswer }: Props) {
                 onClick={() => setSelected(p.id)}
                 data-testid="qa-question"
                 data-pair={p.id}
-                className={`min-h-14 w-full rounded-xl border-2 px-3 py-2 text-left font-semibold ${
+                className={`min-h-14 w-full rounded-lg border px-3 py-2 text-left font-semibold ${
                   matched.includes(p.id) ? "border-success bg-success-soft opacity-70" : selected === p.id ? "border-accent bg-accent-soft" : "border-line bg-surface hover:border-accent"
                 }`}
               >
@@ -350,7 +350,7 @@ function QaMatchBoard({ question, sentence, answered, onAnswer }: Props) {
                 onClick={() => pickAnswer(p.id)}
                 data-testid="qa-answer"
                 data-pair={p.id}
-                className={`min-h-14 w-full rounded-xl border-2 px-3 py-2 text-left ${
+                className={`min-h-14 w-full rounded-lg border px-3 py-2 text-left ${
                   matched.includes(p.id) ? "border-success bg-success-soft opacity-70" : wrongFlash === p.id ? "animate-shake border-danger bg-danger-soft" : "border-line bg-surface hover:border-accent"
                 }`}
               >

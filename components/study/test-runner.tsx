@@ -111,7 +111,7 @@ export function TestRunner({ deckId, cardCount, title, exitHref }: { deckId: str
           }}
           data-testid="test-options"
         >
-          <h2 className="text-2xl font-extrabold">Create a test</h2>
+          <h2 className="text-2xl font-semibold">Create a test</h2>
           <div>
             <label htmlFor="test-count" className="label">
               Number of questions ({minCount}–{cardCount})
@@ -169,11 +169,11 @@ export function TestRunner({ deckId, cardCount, title, exitHref }: { deckId: str
     return (
       <div className="mx-auto max-w-2xl">
         <SessionHeader title={title} exitHref={exitHref} />
-        <div className={`panel animate-pop p-6 text-center ${passed ? "border-success" : "border-danger"}`} data-testid="test-results">
-          <p className="text-5xl font-black" data-testid="test-score">
+        <div className="index-card animate-pop px-6 pb-6 pt-4 text-center" data-testid="test-results">
+          <p className={`headword text-[3.6rem] leading-none tabular-nums ${passed ? "text-success" : "text-danger"}`} data-testid="test-score">
             {pct}%
           </p>
-          <p className={`mt-2 text-xl font-bold ${passed ? "text-success" : "text-danger"}`} data-testid="test-verdict">
+          <p className={`mt-3 text-xl font-semibold ${passed ? "text-success" : "text-danger"}`} data-testid="test-verdict">
             {passed ? "Passed" : "Failed"} <span className="text-sm font-medium text-muted">(pass mark {settings.passMark}%)</span>
           </p>
           <p className="mt-1 text-muted">
@@ -203,7 +203,7 @@ export function TestRunner({ deckId, cardCount, title, exitHref }: { deckId: str
               data-testid="test-result-row"
               data-correct={r.correct}
             >
-              <p className="text-xs font-semibold uppercase text-muted">
+              <p className="text-xs text-muted">
                 {i + 1}. {QUESTION_LABELS[r.q.type]} · {r.correct ? "✓ correct" : "✗ incorrect"}
               </p>
               <p className="mt-1">
@@ -276,7 +276,7 @@ function TestQuestion({
   const inputRef = useRef<HTMLInputElement>(null);
   const name = `q-${q.key}`;
   const heading = (
-    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+    <p className="text-xs text-muted">
       {index + 1}. {QUESTION_LABELS[q.type]}
     </p>
   );
@@ -316,7 +316,7 @@ function TestQuestion({
             {q.options?.map((opt) => (
               <label
                 key={opt}
-                className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border-2 px-3 py-2 ${
+                className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 ${
                   answer?.text === opt ? "border-accent bg-accent-soft" : "border-line"
                 }`}
               >
@@ -343,7 +343,7 @@ function TestQuestion({
             {["True", "False"].map((v) => (
               <label
                 key={v}
-                className={`flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 ${
+                className={`flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border ${
                   answer?.text === v ? "border-accent bg-accent-soft" : "border-line"
                 }`}
               >

@@ -102,7 +102,7 @@ function ConfirmProvider({ children }: { children: ReactNode }) {
           }}
           aria-labelledby="confirm-title"
         >
-          <h2 id="confirm-title" className="text-lg font-bold">
+          <h2 id="confirm-title" className="text-xl font-semibold">
             {state.title}
           </h2>
           {state.message && <p className="mt-2 text-muted">{state.message}</p>}

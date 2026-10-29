@@ -24,7 +24,7 @@ const TOC = [
 
 function H2({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="scroll-mt-20 pt-4 text-2xl font-extrabold">
+    <h2 id={id} className="scroll-mt-20 pt-4 text-2xl font-semibold">
       {children}
     </h2>
   );
@@ -56,8 +56,8 @@ export default async function HelpPage() {
   return (
     <article className="mx-auto max-w-3xl space-y-4 pb-10 leading-relaxed">
       <header className="space-y-2">
-        <p className="text-sm font-semibold uppercase tracking-wide text-accent">Guide</p>
-        <h1 className="text-3xl font-black tracking-tight sm:text-4xl">How Vocab Flashcards works</h1>
+        <p className="text-sm font-medium text-margin">Guide</p>
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">How Vocab Flashcards works</h1>
         <p className="text-muted">
           Everything you need to know: how words move from “new” to “learned”, what each study mode does, and how to set
           things up.
@@ -81,12 +81,12 @@ export default async function HelpPage() {
       <H2 id="start">Quick start</H2>
       <ol className="list-decimal space-y-2 pl-6">
         <li>
-          <b>Create a deck</b> (<Link href="/decks/new" className="text-accent underline">＋ Create deck</Link>): choose the
+          <b>Create a deck</b> (<Link href="/decks/new" className="text-accent underline">Create deck</Link>): choose the
           language you’re learning (term language) and your own language (definition language).
         </li>
         <li>
-          <b>Add words</b>: type a term and its meaning, use <b>✨ Auto-fill definition</b> to get a suggestion, or paste a
-          whole list with <b>📋 Bulk import</b> (one word per line: <code>la casa - house</code>). Press <b>Save</b>. Pictures are
+          <b>Add words</b>: type a term and its meaning, use <b>Auto-fill definition</b> to get a suggestion, or paste a
+          whole list with <b>Bulk import</b> (one word per line: <code>la casa - house</code>). Press <b>Save</b>. Pictures are
           found automatically.
         </li>
         <li>
@@ -104,7 +104,7 @@ export default async function HelpPage() {
       <div className="panel overflow-x-auto">
         <table className="w-full min-w-[34rem] text-sm">
           <caption className="sr-only">The learning ladder</caption>
-          <thead className="bg-surface-2 text-left text-xs uppercase tracking-wide text-muted">
+          <thead className="bg-surface-2 text-left text-xs text-muted">
             <tr>
               <th scope="col" className="px-3 py-2">Stage</th>
               <th scope="col" className="px-3 py-2">What you do</th>
@@ -171,7 +171,7 @@ export default async function HelpPage() {
           <b>Keep going anyway</b> for a bonus round (one more step per word, a few more new words).
         </li>
       </ol>
-      <h3 className="pt-2 text-lg font-bold">Topics: one group at a time</h3>
+      <h3 className="pt-2 text-xl font-semibold">Topics: one group at a time</h3>
       <ul className="list-disc space-y-2 pl-6">
         <li>
           Your deck is split into <b>topics</b>. With your Gemini key they’re real themes (e.g. “Kitchen”, “Food”); without
@@ -193,7 +193,7 @@ export default async function HelpPage() {
       <H2 id="sentences">Sentences: words in context</H2>
       <p>
         Words stick better when you meet them in real sentences. Add sentences to a deck in the editor (type them, use{" "}
-        <b>📋 Bulk import → Sentences</b>, or <b>✨ Generate sentences</b> with your Gemini key). The app finds which of the
+        <b>Bulk import → Sentences</b>, or <b>Generate sentences</b> with your Gemini key). The app finds which of the
         deck’s words each sentence uses, even when they’re conjugated (<i>kommen</i> → <i>kommst</i>).
       </p>
       <ul className="list-disc space-y-2 pl-6">
@@ -222,7 +222,7 @@ export default async function HelpPage() {
         </li>
         <li>
           <b>Part of your daily session:</b> up to <b>{s.sentencesPerDay}</b> sentence exercises are added to the end of each
-          Learn session once sentences unlock (setting “Sentences per day”). The <b>💬 Sentences</b> mode lets you practise
+          Learn session once sentences unlock (setting “Sentences per day”). The <b>Sentences</b> mode lets you practise
           more.
         </li>
         <li>
@@ -238,7 +238,7 @@ export default async function HelpPage() {
           ["🃏 Flashcards", "Flip cards (tap, click or Space). Sort them with “Know it” (→) or “Still learning” (←), or swipe on a phone. At the end you can study only the still-learning ones again. Options: shuffle, definition first."],
           ["✍️ Write", "Every word as a writing question in random order. Wrong ones come back at the end."],
           ["🎧 Listen", "Dictation: you only hear the word (🔊 replay, 🐢 slow) and type it."],
-          ["💬 Sentences", "Practise unlocked sentences: fill in the blank, read, word order, question & answer."],
+          ["Sentences", "Practise unlocked sentences: fill in the blank, read, word order, question & answer."],
           ["🎯 Match", "Match 6 words with their meanings as fast as you can. Wrong pairs add 1 second. Your best time per deck is saved."],
           ["📝 Test", "A generated exam: choose how many questions and which types (multiple choice, write, listen & write, true/false). You get a score, pass/fail (pass mark in Settings), and can retake only the ones you missed."],
           ["🔁 Review all due", "From the dashboard: practises every word that is due today, across all your decks."],
@@ -287,7 +287,7 @@ export default async function HelpPage() {
           multiple choice (15%).
         </li>
         <li>
-          Your <b>streak 🔥</b> counts the days in a row on which you answered at least one question.
+          Your <b>streak </b> counts the days in a row on which you answered at least one question.
         </li>
       </ul>
 
@@ -356,7 +356,7 @@ export default async function HelpPage() {
         <li>
           <b>With your Gemini key</b>, when you save a deck, Gemini looks at each word and decides whether a picture helps,
           picks a good search word for it, and sorts the words into topics. For decks you made earlier, press{" "}
-          <b>✨ Organize with AI</b> on the deck page — it also removes automatic pictures from words that don’t need one.
+          <b>Organize with AI</b> on the deck page — it also removes automatic pictures from words that don’t need one.
         </li>
         <li>
           <b>Without a key</b>, words whose meaning is an English verb (“to …”) get no picture; everything else gets one.
@@ -401,7 +401,7 @@ export default async function HelpPage() {
         </li>
         <li>A <b>cloud voice</b> when your device has no voice for a language (or always, with “Prefer cloud voice”).</li>
         <li>
-          <b>✨ Generate deck</b>: type a topic (e.g. “kitchen items”) and get up to 30 cards to review and edit before saving.
+          <b>Generate deck</b>: type a topic (e.g. “kitchen items”) and get up to 30 cards to review and edit before saving.
         </li>
       </ul>
       <p className="text-sm text-muted">

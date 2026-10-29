@@ -42,7 +42,7 @@ export function ShortcutsOverlay() {
       className="m-auto w-[min(92vw,24rem)] rounded-2xl border border-line bg-surface p-6 text-fg shadow-card backdrop:bg-black/50"
       aria-labelledby="shortcuts-title"
     >
-      <h2 id="shortcuts-title" className="text-lg font-bold">
+      <h2 id="shortcuts-title" className="text-xl font-semibold">
         Keyboard shortcuts
       </h2>
       <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">

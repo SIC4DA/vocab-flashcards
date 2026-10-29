@@ -84,7 +84,11 @@ function NumberField({
 }
 
 function GeminiKeySection() {
-  const { gemini, geminiKeyHint } = useApp();
+  const app = useApp();
+  // Shown immediately after saving/removing; the refreshed server data takes over afterwards.
+  const [local, setLocal] = useState<{ gemini: boolean; hint: string | null } | null>(null);
+  const gemini = local?.gemini ?? app.gemini;
+  const geminiKeyHint = local ? local.hint : app.geminiKeyHint;
   const toast = useToast();
   const confirm = useConfirm();
   const router = useRouter();
@@ -97,7 +101,8 @@ function GeminiKeySection() {
     setError("");
     setBusy(true);
     try {
-      await api("/api/account/gemini-key", { method: "PUT", body: { apiKey: value } });
+      const res = await api<{ hasKey: boolean; hint: string | null }>("/api/account/gemini-key", { method: "PUT", body: { apiKey: value } });
+      setLocal({ gemini: res.hasKey, hint: res.hint });
       setValue("");
       toast.show("Gemini key saved — AI features are on", { kind: "success" });
       router.refresh();
@@ -111,6 +116,7 @@ function GeminiKeySection() {
   async function removeKey() {
     if (!(await confirm({ title: "Remove your Gemini key?", message: "AI features will turn off. Everything else keeps working.", confirmLabel: "Remove key", danger: true }))) return;
     await api("/api/account/gemini-key", { method: "DELETE" });
+    setLocal({ gemini: false, hint: null });
     toast.show("Gemini key removed");
     router.refresh();
   }
@@ -118,18 +124,18 @@ function GeminiKeySection() {
   return (
     <section className="panel space-y-4 p-5" aria-labelledby="ai-h" data-testid="gemini-section">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 id="ai-h" className="mr-auto text-lg font-bold">
-          ✨ AI features (optional)
+        <h2 id="ai-h" className="mr-auto text-xl font-semibold">
+          AI features (optional)
         </h2>
         <span className={`chip ${gemini ? "bg-success-soft text-success" : ""}`} data-testid="gemini-status">
-          {gemini ? `Connected · key ${geminiKeyHint}` : "Not connected"}
+          {gemini ? `Connected, key ${geminiKeyHint}` : "Not connected"}
         </span>
       </div>
       <p className="text-sm text-muted">
         The app works fully without AI. If you add your own free <b>Google Gemini API key</b>, you also get: better
         definition suggestions with an example sentence, smarter image search for non-English definitions, a cloud voice
         for words without a native recording, and
-        <b> ✨ Generate deck</b> from a topic.
+        <b> Generate deck</b> from a topic.
       </p>
       <details className="rounded-xl bg-surface-2 p-3 text-sm">
         <summary className="cursor-pointer font-semibold">How do I get a free key? (2 minutes)</summary>
@@ -240,16 +246,16 @@ export function SettingsView() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-extrabold">Settings</h1>
+        <h1 className="text-2xl font-semibold">Settings</h1>
         <Link href="/help" className="btn-secondary text-sm">
-          📖 How the app works
+          How the app works
         </Link>
       </div>
 
       <GeminiKeySection />
 
       <section className="panel divide-y divide-line px-5" aria-labelledby="audio-h">
-        <h2 id="audio-h" className="py-4 text-lg font-bold">
+        <h2 id="audio-h" className="py-4 text-xl font-semibold">
           Audio
         </h2>
         <Toggle id="s-autoterm" label="Auto-play term audio" hint="When a card appears" checked={settings.autoPlayTerm} onChange={(v) => save({ autoPlayTerm: v })} />
@@ -289,7 +295,7 @@ export function SettingsView() {
       </section>
 
       <section className="panel divide-y divide-line px-5" aria-labelledby="study-h">
-        <h2 id="study-h" className="py-4 text-lg font-bold">
+        <h2 id="study-h" className="py-4 text-xl font-semibold">
           Studying
         </h2>
         <Toggle id="s-strict" label="Strict accents" hint="Answers with wrong accents count as incorrect" checked={settings.strictAccents} onChange={(v) => save({ strictAccents: v })} />
@@ -327,14 +333,14 @@ export function SettingsView() {
       </section>
 
       <section className="panel px-5 py-4" aria-labelledby="theme-h">
-        <h2 id="theme-h" className="text-lg font-bold">
+        <h2 id="theme-h" className="text-xl font-semibold">
           Theme
         </h2>
         <div className="mt-3 flex gap-2" role="radiogroup" aria-labelledby="theme-h">
           {(["system", "light", "dark"] as const).map((t) => (
             <label
               key={t}
-              className={`flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 capitalize ${
+              className={`flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border capitalize ${
                 settings.theme === t ? "border-accent bg-accent-soft" : "border-line"
               }`}
             >
@@ -346,7 +352,7 @@ export function SettingsView() {
       </section>
 
       <form className="panel space-y-3 p-5" onSubmit={changePassword} aria-labelledby="pw-h" noValidate>
-        <h2 id="pw-h" className="text-lg font-bold">
+        <h2 id="pw-h" className="text-xl font-semibold">
           Change password
         </h2>
         {(
@@ -379,7 +385,7 @@ export function SettingsView() {
       </form>
 
       <form className="panel space-y-3 border-danger p-5" onSubmit={deleteAccount} aria-labelledby="del-h">
-        <h2 id="del-h" className="text-lg font-bold text-danger">
+        <h2 id="del-h" className="text-xl font-semibold text-danger">
           Delete account
         </h2>
         <p className="text-sm text-muted">This permanently deletes your account and all your data.</p>

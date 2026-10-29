@@ -7,6 +7,7 @@ import { langDir } from "@/lib/languages";
 import type { Question, StudyCard } from "@/lib/learn";
 import { gradeFor, type Grade } from "@/lib/srs";
 import { AudioButton, useSpeak } from "../audio";
+import { CheckIcon, CrossIcon } from "../icons";
 import { CardImage } from "../card-image";
 import { useApp } from "../providers";
 import { SpecialCharsBar } from "../ui";
@@ -72,7 +73,7 @@ function Prompt({ card, show }: { card: StudyCard; show: "term" | "definition" |
   if (show === "audio") {
     return (
       <div className="flex flex-col items-center gap-3 py-4" data-testid="prompt-audio">
-        <p className="text-sm font-semibold uppercase tracking-wide text-muted">Listen</p>
+        <p className="text-sm text-muted">Listen</p>
         <div className="flex items-center gap-3">
           <AudioButton text={card.term} lang={card.termLang} size="lg" label="Play the word again" />
           <AudioButton text={card.term} lang={card.termLang} size="lg" slow label="Play the word slowly" />
@@ -83,9 +84,9 @@ function Prompt({ card, show }: { card: StudyCard; show: "term" | "definition" |
   if (show === "term") {
     return (
       <div className="flex flex-col items-center gap-2 py-4 text-center">
-        <p className="text-sm font-semibold uppercase tracking-wide text-muted">Term</p>
+        <p className="text-sm text-muted">Term</p>
         <div className="flex items-center gap-2">
-          <p className="text-3xl font-bold sm:text-4xl" dir={langDir(card.termLang)} lang={card.termLang} data-testid="prompt-term">
+          <p className="headword text-[2.4rem] leading-tight sm:text-[2.8rem]" dir={langDir(card.termLang)} lang={card.termLang} data-testid="prompt-term">
             {card.term}
           </p>
           <AudioButton text={card.term} lang={card.termLang} />
@@ -97,9 +98,9 @@ function Prompt({ card, show }: { card: StudyCard; show: "term" | "definition" |
     <div className="flex flex-col items-center gap-3 py-2 text-center sm:flex-row sm:justify-center sm:text-left">
       <CardImage src={card.imageUrl} alt={card.definition} term={card.term} className="h-28 w-28 sm:h-36 sm:w-36" hideIfMissing />
       <div>
-        <p className="text-sm font-semibold uppercase tracking-wide text-muted">Definition</p>
+        <p className="text-sm text-muted">Definition</p>
         <div className="flex items-center justify-center gap-2 sm:justify-start">
-          <p className="text-2xl font-bold sm:text-3xl" dir={langDir(card.definitionLang)} data-testid="prompt-definition">
+          <p className="headword text-[1.9rem] leading-tight sm:text-[2.2rem]" dir={langDir(card.definitionLang)} data-testid="prompt-definition">
             {card.definition}
           </p>
           <AudioButton text={card.definition} lang={card.definitionLang} />
@@ -153,15 +154,15 @@ export function MultipleChoiceQuestion({ question, card, answered, onAnswer }: Q
                 lang={optionLang}
                 data-testid="mc-option"
                 data-correct={answered ? String(isAnswer) : undefined}
-                className={`flex min-h-14 w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-lg font-medium transition-colors ${
+                className={`flex min-h-14 w-full items-center gap-3 rounded-lg border px-4 py-3 text-left text-lg transition-colors ${
                   state === "correct"
-                    ? "border-success bg-success-soft"
+                    ? "border-success bg-success-soft text-fg shadow-[inset_3px_0_0_var(--success)]"
                     : state === "wrong"
-                      ? "animate-shake border-danger bg-danger-soft"
-                      : "border-line bg-surface hover:border-accent disabled:opacity-60"
+                      ? "animate-shake border-danger bg-danger-soft text-fg shadow-[inset_3px_0_0_var(--danger)]"
+                      : "border-line bg-surface hover:border-accent hover:shadow-[inset_3px_0_0_var(--accent)] disabled:opacity-60"
                 }`}
               >
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-2 text-sm font-bold text-muted" aria-hidden>
+                <span className="w-4 shrink-0 text-sm tabular-nums text-muted" aria-hidden>
                   {i + 1}
                 </span>
                 <span className="min-w-0 break-words">{opt}</span>
@@ -292,7 +293,7 @@ export function FlipCard({
 }) {
   const termFace = (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-      <p className="text-[2rem] font-bold leading-tight sm:text-5xl" dir={langDir(card.termLang)} lang={card.termLang} data-testid="flashcard-term">
+      <p className="headword text-[2.6rem] leading-tight sm:text-[3.6rem]" dir={langDir(card.termLang)} lang={card.termLang} data-testid="flashcard-term">
         {card.term}
       </p>
       <AudioButton text={card.term} lang={card.termLang} size="lg" />
@@ -310,7 +311,7 @@ export function FlipCard({
         className="h-32 w-full max-w-60 sm:h-40"
       />
       <div className="flex items-center gap-2">
-        <p className="text-2xl font-bold sm:text-3xl" dir={langDir(card.definitionLang)} data-testid="flashcard-definition">
+        <p className="headword text-[1.9rem] leading-tight sm:text-[2.4rem]" dir={langDir(card.definitionLang)} data-testid="flashcard-definition">
           {card.definition}
         </p>
         <AudioButton text={card.definition} lang={card.definitionLang} />
@@ -335,10 +336,10 @@ export function FlipCard({
         data-testid="flashcard"
         data-flipped={flipped}
       >
-        <div className="flip-face panel" inert={flipped}>
+        <div className="flip-face index-card" inert={flipped}>
           {reverse ? defFace : termFace}
         </div>
-        <div className="flip-face flip-back panel" inert={!flipped}>
+        <div className="flip-face flip-back index-card" inert={!flipped}>
           {reverse ? termFace : defFace}
         </div>
       </div>
@@ -364,7 +365,7 @@ export function NewCardQuestion({ card, onAnswer, answered }: QuestionProps) {
   });
   return (
     <div className="space-y-4">
-      <p className="text-center text-sm font-semibold uppercase tracking-wide text-accent">New word</p>
+      <p className="text-center text-sm font-medium text-margin">New word</p>
       <FlipCard
         card={card}
         flipped={flipped}
@@ -426,21 +427,21 @@ export function Feedback({
         : "Not quite";
   return (
     <div
-      className={`animate-pop mt-6 rounded-2xl border-2 p-4 ${outcome.correct ? "border-success bg-success-soft" : "border-danger bg-danger-soft"}`}
+      className={`animate-pop mt-6 rounded-lg border-l-4 px-5 py-4 ${outcome.correct ? "border-success bg-success-soft" : "border-danger bg-danger-soft"}`}
       data-testid="feedback"
       data-correct={outcome.correct}
     >
-      <p className={`flex items-center gap-2 text-lg font-bold ${outcome.correct ? "text-success" : "text-danger"}`}>
-        <span aria-hidden>{outcome.correct ? "✓" : "✗"}</span> {title}
+      <p className={`flex items-center gap-2 font-display text-xl font-semibold ${outcome.correct ? "text-success" : "text-danger"}`}>
+        {outcome.correct ? <CheckIcon size={22} strokeWidth={2.4} /> : <CrossIcon size={22} strokeWidth={2.4} />} {title}
       </p>
       {(!outcome.correct || v === "accent" || v === "typo") && (
         <div className="mt-2">
           <p className="text-sm text-muted">Correct answer</p>
-          <p className="flex items-center gap-2 text-2xl font-bold" dir={langDir(card.termLang)} lang={card.termLang}>
+          <p className="headword flex items-center gap-2 text-[1.7rem]" dir={langDir(card.termLang)} lang={card.termLang}>
             <span data-testid="correct-answer">
               {v === "typo" || v === "accent"
                 ? diffSegments(outcome.answerGiven, card.term).map((s, i) => (
-                    <span key={i} className={s.ok ? "" : "rounded bg-warning-soft px-0.5 text-warning underline"}>
+                    <span key={i} className={s.ok ? "" : "text-danger underline decoration-2 underline-offset-4"}>
                       {s.text}
                     </span>
                   ))

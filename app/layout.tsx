@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans, Noto_Sans_Arabic, Noto_Sans_Hebrew } from "next/font/google";
+import { Literata, Noto_Sans, Noto_Sans_Arabic, Noto_Sans_Hebrew, Schibsted_Grotesk } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Header } from "@/components/header";
@@ -7,6 +7,12 @@ import { ShortcutsOverlay } from "@/components/shortcuts-overlay";
 import { getCurrentUser } from "@/lib/current-user";
 import { signupsAllowed } from "@/lib/env";
 import { DEFAULT_SETTINGS } from "@/lib/validation";
+
+// Interface text.
+// Only the basic Latin files are loaded (covers German, French, Spanish…); other scripts fall back to Noto.
+const ui = Schibsted_Grotesk({ variable: "--font-ui", subsets: ["latin"], display: "swap" });
+// Headwords, deck titles and headings (dictionary character).
+const headword = Literata({ variable: "--font-headword", subsets: ["latin"], weight: ["500", "600"], display: "swap" });
 
 const noto = Noto_Sans({
   variable: "--font-noto",
@@ -26,8 +32,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f6fb" },
-    { media: "(prefers-color-scheme: dark)", color: "#11131c" },
+    { media: "(prefers-color-scheme: light)", color: "#f2f4f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#121a2c" },
   ],
 };
 
@@ -38,7 +44,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       data-theme={settings.theme}
-      className={`${noto.variable} ${notoArabic.variable} ${notoHebrew.variable} h-full antialiased`}
+      className={`${ui.variable} ${headword.variable} ${noto.variable} ${notoArabic.variable} ${notoHebrew.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col">

@@ -147,25 +147,31 @@ export function DeckOverview({
     toast.show("Card progress reset");
   }
 
+  const otherModes = MODES.filter((m) => m.mode !== "learn");
+  const doneToday = cards.length - buckets.new;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-10 pt-2">
       <section>
-        <Link href="/" className="text-sm font-semibold text-accent hover:underline">
-          ← All decks
+        <Link href="/" className="text-sm font-medium text-muted hover:text-accent">
+          All decks
         </Link>
-        <div className="mt-2 flex flex-wrap items-start gap-3">
+        <div className="mt-3 flex flex-wrap items-end gap-x-6 gap-y-4">
           <div className="mr-auto min-w-0">
-            <h1 className="text-3xl font-black tracking-tight" data-testid="deck-title">
+            <p className="text-sm text-muted">
+              <span aria-hidden>{termLang.flag}</span> {termLang.name} <span aria-hidden>/</span>
+              <span className="sr-only">to</span> <span aria-hidden>{defLang.flag}</span> {defLang.name}
+            </p>
+            <h1 className="headword mt-1 text-[2.4rem] leading-[1.1] sm:text-[3rem]" data-testid="deck-title">
               {deck.title}
             </h1>
-            <p className="mt-1 text-muted">
-              <span aria-hidden>{termLang.flag}</span> {termLang.name} → <span aria-hidden>{defLang.flag}</span>{" "}
-              {defLang.name} · {cards.length} cards · studied {formatDate(deck.lastStudiedAt).toLowerCase()}
+            <p className="mt-2 text-muted">
+              {cards.length} cards, studied {formatDate(deck.lastStudiedAt).toLowerCase()}
             </p>
             {deck.description && <p className="mt-2 max-w-2xl">{deck.description}</p>}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href={`/decks/${deck.id}/edit`} className="btn-primary">
+          <div className="-ml-2 flex flex-wrap gap-0.5 sm:ml-0 sm:gap-2">
+            <Link href={`/decks/${deck.id}/edit`} className="btn-secondary px-3 text-sm sm:px-4 sm:text-[0.95rem]">
               Edit
             </Link>
             {gemini && cards.length > 0 && (
@@ -177,16 +183,16 @@ export function DeckOverview({
                 title="Group words by topic and keep pictures only for words where a picture helps"
                 data-testid="organize-ai"
               >
-                {organizing ?? "✨ Organize with AI"}
+                {organizing ?? "Organize with AI"}
               </button>
             )}
-            <button type="button" className="btn-secondary" onClick={duplicate} disabled={busy}>
+            <button type="button" className="btn-ghost px-2.5 text-sm sm:px-4 sm:text-[0.95rem]" onClick={duplicate} disabled={busy}>
               Duplicate
             </button>
-            <a href={`/api/decks/${deck.id}/export.csv`} className="btn-secondary" download>
+            <a href={`/api/decks/${deck.id}/export.csv`} className="btn-ghost px-2.5 text-sm sm:px-4 sm:text-[0.95rem]" download>
               Export CSV
             </a>
-            <button type="button" className="btn-secondary text-danger" onClick={remove} disabled={busy}>
+            <button type="button" className="btn-ghost px-2.5 text-sm text-danger sm:px-4 sm:text-[0.95rem]" onClick={remove} disabled={busy}>
               Delete
             </button>
           </div>
@@ -201,77 +207,85 @@ export function DeckOverview({
         </EmptyState>
       ) : (
         <>
-          <section aria-label="Study modes">
+          <section aria-label="Study modes" className="grid gap-6 lg:grid-cols-[1.15fr_1fr]">
             <h2 className="sr-only">Study modes</h2>
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-              {MODES.map((m) => {
-                const inner = (
+            <Link
+              href={`/decks/${deck.id}/study/learn`}
+              className="index-card ruled group relative flex flex-col px-6 pb-6 pt-3 sm:px-8"
+              data-testid="mode-learn"
+            >
+              <span className="flex h-8 items-center text-sm text-muted">Your daily session</span>
+              <span className="headword text-[2.2rem] leading-[64px] text-fg group-hover:text-accent">Learn</span>
+              <span className="text-[0.95rem] leading-8 text-fg">
+                {dueCount > 0 ? (
                   <>
-                    <span aria-hidden className="text-2xl">
-                      {m.icon}
-                    </span>
-                    <span className="font-bold">{m.label}</span>
-                    <span className={`text-xs ${m.mode === "learn" ? "opacity-90" : "text-muted"}`}>
+                    <span className="highlight">{dueCount} due</span> plus new words from{" "}
+                  </>
+                ) : (
+                  <>New words from </>
+                )}
+                {topics.find((t) => t.current)?.label ?? "your deck"}.
+              </span>
+              <span className="leading-8 text-muted">
+                {doneToday} of {cards.length} words started, {buckets.mastered} mastered.
+              </span>
+              <span className="btn-primary mt-4 self-start px-6">Start learning</span>
+            </Link>
+            <ul className="divide-y divide-line border-y border-line self-start">
+              {otherModes.map((m) => (
+                <li key={m.mode}>
+                  <Link
+                    href={`/decks/${deck.id}/study/${m.mode}`}
+                    className="group flex min-h-14 items-baseline justify-between gap-4 px-1 py-3"
+                    data-testid={`mode-${m.mode}`}
+                  >
+                    <span className="font-display text-lg font-semibold group-hover:text-accent">{m.label}</span>
+                    <span className="text-right text-sm text-muted">
                       {m.mode === "sentences" && sentences.length
                         ? `${sentences.filter((x) => x.unlocked).length}/${sentences.length} unlocked`
                         : m.desc}
                     </span>
-                  </>
-                );
-                const cls =
-                  "panel flex min-h-28 flex-col items-center justify-center gap-1 p-3 text-center transition-transform";
-                return (
-                  <li key={m.mode} className={m.mode === "learn" ? "col-span-2 sm:col-span-1" : undefined}>
-                    <Link
-                      href={`/decks/${deck.id}/study/${m.mode}`}
-                      className={`${cls} hover:-translate-y-0.5 hover:border-accent ${
-                        m.mode === "learn" ? "border-accent bg-accent text-on-accent hover:bg-accent-strong" : ""
-                      }`}
-                      data-testid={`mode-${m.mode}`}
-                    >
-                      {inner}
-                    </Link>
-                  </li>
-                );
-              })}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </section>
 
-          <section className="panel p-5" aria-labelledby="topics-h" data-testid="topics-panel">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 id="topics-h" className="font-bold">
+          <section aria-labelledby="topics-h" data-testid="topics-panel">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line pb-2">
+              <h2 id="topics-h" className="text-xl font-semibold">
                 {hasTopics ? "Topics" : "Sets"}
               </h2>
-              <p className="text-xs text-muted">
-                Learn teaches one {hasTopics ? "topic" : "set"} at a time. The next one starts when 3 of every 4 words
-                can be written.{" "}
-                <Link href="/help#learned" className="font-semibold text-accent hover:underline">
+              <p className="text-sm text-muted">
+                One {hasTopics ? "topic" : "set"} at a time; the next starts when 3 of every 4 words can be written.{" "}
+                <Link href="/help#learned" className="font-medium text-accent hover:underline">
                   How it works
                 </Link>
               </p>
             </div>
-            <ol className="mt-3 grid gap-2 sm:grid-cols-2">
+            <ol className="grid gap-x-8 sm:grid-cols-2">
               {topics.map((t, i) => (
                 <li
                   key={t.key}
-                  className={`rounded-xl border p-3 ${t.current ? "border-accent bg-accent-soft" : "border-line"}`}
+                  className={`border-b border-line py-3 pl-3 ${t.current ? "border-l-2 border-l-accent" : "border-l-2 border-l-transparent"}`}
                   data-testid="topic-row"
                   data-current={t.current}
                 >
-                  <div className="flex items-center justify-between gap-2 text-sm">
+                  <div className="flex items-baseline justify-between gap-2">
                     <span className="font-semibold">
-                      {i + 1}. {t.label}
+                      <span className="mr-1.5 text-muted tabular-nums">{i + 1}.</span>
+                      {t.label}
                     </span>
-                    <span className={`text-xs font-bold ${t.finished ? "text-success" : t.current ? "text-accent" : "text-muted"}`}>
-                      {t.mastered === t.total ? "✓ Mastered" : t.finished ? "✓ Done" : t.current ? "Learning now" : t.new === t.total ? "Up next" : "In progress"}
+                    <span className={`text-sm ${t.finished ? "text-success" : t.current ? "font-semibold text-accent" : "text-muted"}`}>
+                      {t.mastered === t.total ? "Mastered" : t.finished ? "Done" : t.current ? "Learning now" : t.new === t.total ? "Up next" : "In progress"}
                     </span>
                   </div>
-                  <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+                  <div className="mt-2 flex h-[3px] overflow-hidden bg-rule" aria-hidden>
                     <div className="bg-success" style={{ width: `${(t.mastered / t.total) * 100}%` }} />
-                    <div className="bg-warning" style={{ width: `${((t.written - t.mastered) / t.total) * 100}%` }} />
+                    <div className="bg-accent" style={{ width: `${((t.written - t.mastered) / t.total) * 100}%` }} />
                   </div>
-                  <p className="mt-1 text-xs text-muted">
-                    {t.mastered}/{t.total} mastered · {t.written - t.mastered} written · {t.new} new
+                  <p className="mt-1.5 text-xs text-muted">
+                    {t.mastered}/{t.total} mastered, {t.written - t.mastered} written, {t.new} new
                   </p>
                 </li>
               ))}
@@ -283,33 +297,32 @@ export function DeckOverview({
           <section className="grid gap-4 md:grid-cols-[2fr_1fr]" aria-label="Progress">
             <div className="panel p-5">
               <div className="flex items-center justify-between">
-                <h2 className="font-bold">
+                <h2 className="text-xl font-semibold">
                 Progress{" "}
-                <Link href="/help#learned" className="ml-1 text-xs font-semibold text-accent hover:underline">
+                <Link href="/help#learned" className="ml-2 font-sans text-sm font-medium text-accent hover:underline">
                   When is a word learned?
                 </Link>
               </h2>
-                <span className="chip" data-testid="deck-due">
+                <span className="highlight text-sm" data-testid="deck-due">
                   {dueCount} due today
                 </span>
               </div>
-              <div className="mt-4 flex h-4 overflow-hidden rounded-full bg-surface-2" aria-hidden>
-                <div className="bg-muted/40" style={{ width: `${(buckets.new / cards.length) * 100}%` }} />
-                <div className="bg-warning" style={{ width: `${(buckets.learning / cards.length) * 100}%` }} />
+              <div className="mt-4 flex h-2 overflow-hidden rounded-[2px] bg-rule" aria-hidden>
                 <div className="bg-success" style={{ width: `${(buckets.mastered / cards.length) * 100}%` }} />
+                <div className="bg-accent" style={{ width: `${(buckets.learning / cards.length) * 100}%` }} />
               </div>
-              <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
+              <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
                 <div>
                   <dt className="text-muted">New</dt>
-                  <dd className="text-xl font-bold" data-testid="count-new">{buckets.new}</dd>
+                  <dd className="font-display text-2xl font-semibold tabular-nums" data-testid="count-new">{buckets.new}</dd>
                 </div>
                 <div>
-                  <dt className="text-warning">Learning</dt>
-                  <dd className="text-xl font-bold" data-testid="count-learning">{buckets.learning}</dd>
+                  <dt className="text-accent">Learning</dt>
+                  <dd className="font-display text-2xl font-semibold tabular-nums" data-testid="count-learning">{buckets.learning}</dd>
                 </div>
                 <div>
                   <dt className="text-success">Mastered</dt>
-                  <dd className="text-xl font-bold" data-testid="count-mastered">{buckets.mastered}</dd>
+                  <dd className="font-display text-2xl font-semibold tabular-nums" data-testid="count-mastered">{buckets.mastered}</dd>
                 </div>
               </dl>
               {deck.matchBestMs && (
@@ -319,7 +332,7 @@ export function DeckOverview({
               )}
             </div>
             <div className="panel p-5">
-              <h2 className="font-bold">Accuracy by mode</h2>
+              <h2 className="text-xl font-semibold">Accuracy by mode</h2>
               {accuracy.length === 0 ? (
                 <p className="mt-2 text-sm text-muted">No answers yet.</p>
               ) : (
@@ -338,28 +351,28 @@ export function DeckOverview({
           </section>
 
           <section className="panel overflow-hidden" aria-label="Cards">
-            <div className="flex items-center justify-between p-4">
-              <h2 className="font-bold">Cards</h2>
+            <div className="flex items-center justify-between px-5 py-4">
+              <h2 className="text-xl font-semibold">Words</h2>
               <button type="button" className="btn-ghost text-sm text-danger" onClick={resetDeck}>
                 Reset deck progress
               </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[40rem] text-sm">
-                <thead className="bg-surface-2 text-left text-xs uppercase tracking-wide text-muted">
+                <thead className="border-y border-line text-left text-sm text-muted">
                   <tr>
-                    <th className="px-4 py-2" scope="col">
+                    <th className="px-4 py-2 font-medium" scope="col">
                       <span className="sr-only">Image</span>
                     </th>
-                    <th className="px-4 py-2" scope="col">Term</th>
-                    <th className="px-4 py-2" scope="col">Definition</th>
+                    <th className="px-4 py-2 font-medium" scope="col">Term</th>
+                    <th className="px-4 py-2 font-medium" scope="col">Definition</th>
                     {hasTopics && (
-                      <th className="px-4 py-2" scope="col">Topic</th>
+                      <th className="px-4 py-2 font-medium" scope="col">Topic</th>
                     )}
-                    <th className="px-4 py-2" scope="col">Stage</th>
-                    <th className="px-4 py-2" scope="col">Next due</th>
-                    <th className="px-4 py-2" scope="col">✓ / ✗</th>
-                    <th className="px-4 py-2" scope="col">
+                    <th className="px-4 py-2 font-medium" scope="col">Stage</th>
+                    <th className="px-4 py-2 font-medium" scope="col">Next due</th>
+                    <th className="px-4 py-2 font-medium" scope="col">Right / wrong</th>
+                    <th className="px-4 py-2 font-medium" scope="col">
                       <span className="sr-only">Actions</span>
                     </th>
                   </tr>
@@ -381,7 +394,7 @@ export function DeckOverview({
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-2 font-semibold" dir={langDir(deck.termLang)} lang={deck.termLang}>
+                        <td className="headword px-4 py-2 text-base" dir={langDir(deck.termLang)} lang={deck.termLang}>
                           <span className="inline-flex items-center gap-1">
                             {c.term}
                             <AudioButton text={c.term} lang={deck.termLang} size="sm" />
@@ -435,19 +448,19 @@ function SentencesPanel({ deckId, sentences, cards }: { deckId: string; sentence
   return (
     <section className="panel p-5" aria-labelledby="sentences-h" data-testid="sentences-panel">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="sentences-h" className="font-bold">
-          💬 Sentences
+        <h2 id="sentences-h" className="text-xl font-semibold">
+          Sentences
         </h2>
         {sentences.length > 0 && (
           <p className="text-sm text-muted" data-testid="sentences-summary">
-            {unlocked.length}/{sentences.length} unlocked · {mastered.length} mastered
+            {unlocked.length} of {sentences.length} unlocked, {mastered.length} mastered
           </p>
         )}
       </div>
       {sentences.length === 0 ? (
         <p className="mt-2 text-sm text-muted">
-          Add example sentences in the editor (📋 Bulk import → Sentences). Each sentence unlocks once you’ve mastered the
-          deck words in it, then you practise it: fill in the blank → read it → put the words in order → match questions
+          Add example sentences in the editor (Bulk import, then Sentences). Each sentence unlocks once you’ve mastered the
+          deck words in it. Then you practise it: fill in the blank, read it, put the words in order, and match questions
           with replies.{" "}
           <Link href={`/decks/${deckId}/edit`} className="font-semibold text-accent hover:underline">
             Add sentences
@@ -459,18 +472,17 @@ function SentencesPanel({ deckId, sentences, cards }: { deckId: string; sentence
             Unlocked sentences join your daily Learn session. A sentence unlocks when every deck word in it is mastered.
           </p>
           {locked.length > 0 && (
-            <ul className="mt-3 space-y-1 text-sm" aria-label="Locked sentences">
+            <ul className="mt-3 divide-y divide-line border-t border-line text-sm" aria-label="Locked sentences">
               {locked.slice(0, 5).map((x) => {
                 const missing = x.cardIds
                   .map((id) => termOf.get(id))
                   .filter((c): c is CardDTO => Boolean(c) && c!.progress.stage < 6)
                   .map((c) => c.term);
                 return (
-                  <li key={x.id} className="flex flex-wrap items-baseline gap-x-2" data-testid="locked-sentence">
-                    <span aria-hidden>🔒</span>
-                    <span className="font-medium">{x.text}</span>
+                  <li key={x.id} className="flex flex-wrap items-baseline justify-between gap-x-3 py-2" data-testid="locked-sentence">
+                    <span className="font-display font-medium text-muted">{x.text}</span>
                     <span className="text-xs text-muted">
-                      {missing.length ? `needs: ${missing.join(", ")}` : "unlocks after your first mastered word"}
+                      {missing.length ? `Locked, needs: ${missing.join(", ")}` : "Locked until your first mastered word"}
                     </span>
                   </li>
                 );

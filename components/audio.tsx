@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { speak } from "@/lib/tts";
+import { SlowIcon, SpeakerIcon } from "./icons";
 import { useApp } from "./providers";
 
 /** Speak with the user's rate / cloud-voice preferences. */
@@ -36,11 +37,11 @@ export function AudioButton({
   size?: "sm" | "md" | "lg";
 }) {
   const say = useSpeak();
-  const sizes = { sm: "text-base", md: "text-xl", lg: "text-3xl min-h-14 min-w-14" };
+  const sizes = { sm: 18, md: 22, lg: 30 };
   return (
     <button
       type="button"
-      className={`btn-icon ${sizes[size]} ${className}`}
+      className={`btn-icon ${size === "lg" ? "min-h-14 min-w-14" : ""} ${className}`}
       aria-label={label ?? (slow ? `Play slowly: ${text}` : `Play: ${text}`)}
       title={slow ? "Slow replay" : "Play audio (P)"}
       onClick={(e) => {
@@ -48,7 +49,7 @@ export function AudioButton({
         void say(text, lang, { slow });
       }}
     >
-      <span aria-hidden>{slow ? "🐢" : "🔊"}</span>
+      {slow ? <SlowIcon size={sizes[size]} /> : <SpeakerIcon size={sizes[size]} />}
     </button>
   );
 }

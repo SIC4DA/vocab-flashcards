@@ -8,14 +8,14 @@ export function ProgressBar({ value, max, label }: { value: number; max: number;
   return (
     <div className="flex items-center gap-3">
       <div
-        className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2"
+        className="h-1 flex-1 overflow-hidden bg-rule"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={max}
         aria-valuenow={value}
         aria-label={label ?? "Progress"}
       >
-        <div className="h-full rounded-full bg-accent transition-[width] duration-300" style={{ width: `${pct}%` }} />
+        <div className="h-full bg-accent transition-[width] duration-300" style={{ width: `${pct}%` }} />
       </div>
       <span className="min-w-14 text-right text-sm font-semibold tabular-nums text-muted" data-testid="progress-text">
         {value} / {max}
@@ -211,11 +211,8 @@ export function Confetti() {
 
 export function EmptyState({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className="panel flex flex-col items-center px-6 py-12 text-center">
-      <div aria-hidden className="mb-3 text-5xl">
-        📚
-      </div>
-      <h2 className="text-xl font-bold">{title}</h2>
+    <div className="index-card mx-auto flex max-w-xl flex-col items-center px-6 pb-10 pt-8 text-center">
+      <h2 className="headword text-2xl leading-8">{title}</h2>
       <div className="mt-2 max-w-md text-muted">{children}</div>
     </div>
   );

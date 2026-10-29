@@ -23,7 +23,7 @@ test("each user adds their own Gemini key in Settings; without it the AI UI is h
   // A valid key connects
   await page.getByLabel("Your Gemini API key").fill(VALID_KEY);
   await page.getByTestId("save-gemini-key").click();
-  await expect(page.getByTestId("gemini-status")).toHaveText("Connected · key …7890");
+  await expect(page.getByTestId("gemini-status")).toHaveText("Connected, key …7890");
   await expect(page.getByText("Prefer cloud voice")).toBeVisible();
   expect((await (await page.request.get("/api/config")).json()).gemini).toBe(true);
 
@@ -41,7 +41,7 @@ test("each user adds their own Gemini key in Settings; without it the AI UI is h
   await rows.nth(2).getByLabel("Definition", { exact: true }).fill("dish / plate");
 
   // Auto-fill also uses Gemini now
-  await page.getByRole("button", { name: "＋ Add card" }).click();
+  await page.getByRole("button", { name: "Add card" }).click();
   await rows.nth(3).getByLabel("Term", { exact: true }).fill("el vaso");
   await rows.nth(3).getByRole("button", { name: /Auto-fill definition/ }).click();
   await expect(rows.nth(3).getByLabel("Definition", { exact: true })).toHaveValue("gemini meaning");

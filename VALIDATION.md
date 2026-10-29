@@ -81,6 +81,12 @@ Speaking practice was removed at the owner's request (see DECISIONS.md #68–71)
 - E2E (desktop + mobile, 3 consecutive passing runs): import 2 sentences in the editor → both locked with "needs: sehr, gut" → learn the 3 words to Mastered (the example sentence shows on a card back) → both unlock → Sentences mode runs fill in the blank → sentence → word order (→ Q&A for the pair) → both mastered.
 - Screenshots of every sentence exercise were reviewed at 390 px and 1280 px.
 
+### Update: redesign
+
+- Full chain passes: lint, typecheck, 155 unit/integration tests, 42 E2E tests (desktop + mobile), build.
+- Lighthouse (mobile, production build) after the redesign: landing 100 / 100 / 100; dashboard 94 / 100 / 100; deck 94 / 100 / 100; flashcards 93 / 100 / 100; Learn 93 / 100 / 96. The one Learn issue is a console 404 for the mock recording URL used in this test setup, which doesn't exist on the real Wikimedia server.
+- Screenshots of every page at 390 px and 1280 px, in light and dark mode, were reviewed and refreshed in `docs/screenshots/`.
+
 ## 14.2 Manual checklist
 
 ### Build

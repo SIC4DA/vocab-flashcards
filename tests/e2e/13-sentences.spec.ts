@@ -67,7 +67,7 @@ test("sentences: import, locked until words are mastered, then fill-in → sente
   await expect(page).toHaveURL(new RegExp(`/decks/${deckId}$`), { timeout: 30_000 });
 
   // Locked until the words are mastered
-  await expect(page.getByTestId("sentences-summary")).toHaveText("0/2 unlocked · 0 mastered");
+  await expect(page.getByTestId("sentences-summary")).toHaveText("0 of 2 unlocked, 0 mastered");
   await expect(page.getByTestId("locked-sentence").first()).toContainText("needs: sehr, gut");
 
   // Learn the words (the example sentence is on the card back)
@@ -98,7 +98,7 @@ test("sentences: import, locked until words are mastered, then fill-in → sente
 
   await page.goto(`/decks/${deckId}`);
   await expect(page.getByTestId("count-mastered")).toHaveText("3");
-  await expect(page.getByTestId("sentences-summary")).toHaveText("2/2 unlocked · 0 mastered");
+  await expect(page.getByTestId("sentences-summary")).toHaveText("2 of 2 unlocked, 0 mastered");
 
   // Practise the sentences
   const sentences = (await (await page.request.get(`/api/decks/${deckId}`)).json()).sentences as { id: string; text: string; reply: string | null }[];
@@ -124,5 +124,5 @@ test("sentences: import, locked until words are mastered, then fill-in → sente
   await expect(page.getByTestId("day-stats")).toContainText("2 sentences mastered");
 
   await page.goto(`/decks/${deckId}`);
-  await expect(page.getByTestId("sentences-summary")).toHaveText("2/2 unlocked · 2 mastered");
+  await expect(page.getByTestId("sentences-summary")).toHaveText("2 of 2 unlocked, 2 mastered");
 });

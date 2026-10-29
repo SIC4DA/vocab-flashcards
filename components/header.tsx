@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useApp } from "./providers";
 import { api } from "@/lib/client/api";
+import { BookIcon, CardMark, GearIcon } from "./icons";
 
 export function Header() {
   const { user } = useApp();
@@ -25,26 +26,24 @@ export function Header() {
 
   return (
     <header className={`border-b border-line bg-surface ${studying ? "hidden sm:block" : ""}`}>
-      <nav className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:px-6" aria-label="Main">
-        <Link href="/" className="mr-auto flex items-center gap-2 text-lg font-extrabold tracking-tight text-fg">
-          <span aria-hidden className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-on-accent">
-            V
-          </span>
-          <span>Vocab</span>
+      <nav className="mx-auto flex h-15 max-w-5xl items-center gap-1 px-4 sm:px-6" aria-label="Main">
+        <Link href="/" className="mr-auto flex items-center gap-2.5 text-fg">
+          <CardMark />
+          <span className="font-display text-xl font-semibold tracking-[-0.02em]">Vocab</span>
         </Link>
-        <Link href="/help" className="btn-ghost px-3 text-sm" aria-current={pathname === "/help" ? "page" : undefined}>
-          <span aria-hidden>📖</span>
+        <Link href="/help" className="btn-ghost px-3 text-sm text-muted aria-[current=page]:text-accent" aria-current={pathname === "/help" ? "page" : undefined}>
+          <BookIcon size={18} />
           <span className="hidden sm:inline">Guide</span>
           <span className="sr-only sm:hidden">Guide</span>
         </Link>
         {user ? (
           <>
-            <Link href="/settings" className="btn-ghost px-3 text-sm" aria-current={pathname === "/settings" ? "page" : undefined}>
-              <span aria-hidden>⚙️</span>
+            <Link href="/settings" className="btn-ghost px-3 text-sm text-muted aria-[current=page]:text-accent" aria-current={pathname === "/settings" ? "page" : undefined}>
+              <GearIcon size={18} />
               <span className="hidden sm:inline">Settings</span>
               <span className="sr-only sm:hidden">Settings</span>
             </Link>
-            <span className="hidden text-sm text-muted md:inline" data-testid="current-user">
+            <span className="ml-2 hidden border-l border-line pl-4 text-sm text-muted md:inline" data-testid="current-user">
               {user.username}
             </span>
             <button type="button" className="btn-ghost px-3 text-sm" onClick={logout} disabled={busy}>
