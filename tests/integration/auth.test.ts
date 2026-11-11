@@ -5,6 +5,7 @@ import * as logout from "@/app/api/auth/logout/route";
 import * as me from "@/app/api/auth/me/route";
 import * as password from "@/app/api/account/password/route";
 import * as settings from "@/app/api/account/settings/route";
+import { resolveSettings } from "@/lib/validation";
 import { call } from "../support/route";
 import { verifySessionToken } from "@/lib/session";
 
@@ -102,9 +103,17 @@ describe("account", () => {
 
   it("updates settings with validation", async () => {
     const { cookie } = await call(register.POST, { body: { username: "setuser", password: "password123" } });
-    const r = await call(settings.PATCH, { method: "PATCH", cookie, body: { advanceAfter: 3, theme: "dark" } });
-    expect(r.json.settings).toMatchObject({ advanceAfter: 3, theme: "dark", speechRate: 0.9 });
-    const bad = await call(settings.PATCH, { method: "PATCH", cookie, body: { advanceAfter: 9 } });
+    const r = await call(settings.PATCH, { method: "PATCH", cookie, body: { soundEffects: false, theme: "dark" } });
+    expect(r.json.settings).toMatchObject({ soundEffects: false, theme: "dark", speechRate: 0.9 });
+    const bad = await call(settings.PATCH, { method: "PATCH", cookie, body: { speechRate: 9 } });
     expect(bad.status).toBe(400);
+    // Study pacing and recordings are fixed: they can't be changed.
+    const fixed = await call(settings.PATCH, { method: "PATCH", cookie, body: { stepsPerDay: 5 } });
+    expect(fixed.status).toBe(400);
+  });
+
+  it("ignores old stored values of settings that are no longer editable", () => {
+    const s = resolveSettings({ stepsPerDay: 5, useRecordings: false, ignoreArticles: true, soundEffects: false });
+    expect(s).toMatchObject({ stepsPerDay: 2, useRecordings: true, ignoreArticles: false, soundEffects: false });
   });
 });

@@ -20,7 +20,6 @@ export const POST = route(async (req, ctx: RouteContext<"/api/cards/[id]/auto-im
       hasUpload: card.imageData !== null,
       noImage: card.noImage,
       imageQuery: card.imageQuery,
-      groupLabel: card.groupLabel,
     },
     deck.definitionLang,
     userGeminiKey(user),

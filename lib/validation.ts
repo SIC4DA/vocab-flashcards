@@ -168,19 +168,10 @@ export const geminiKeySchema = z.object({
     .regex(/^[A-Za-z0-9._\-]+$/, "That doesn't look like a Gemini API key — copy it again from Google AI Studio"),
 });
 
-export const organizeSchema = z.object({
+/** Optional subset of a deck's cards for batch endpoints. */
+export const cardIdsSchema = z.object({
   cardIds: z.array(z.string().uuid()).max(80).optional(),
-  force: z.boolean().optional(),
 });
-
-export const organizedCardsSchema = z.array(
-  z.object({
-    i: z.number().int().min(0),
-    image: z.boolean(),
-    keyword: z.string().max(80).optional().default(""),
-    group: z.string().trim().min(1).max(40),
-  }),
-);
 
 export const matchResultSchema = z.object({ timeMs: z.number().int().min(1).max(3_600_000) });
 
@@ -206,15 +197,25 @@ export const settingsSchema = z.object({
 
 export type Settings = z.infer<typeof settingsSchema>;
 
-export const settingsPatchSchema = settingsSchema.partial();
+/**
+ * What a user can change in Settings. Everything else (recordings, study pacing, answer checking, pass mark)
+ * is fixed at the defaults so every learner gets the same, tested experience.
+ */
+export const EDITABLE_SETTINGS = ["autoPlayTerm", "autoPlayDefinition", "speechRate", "soundEffects", "theme"] as const;
+
+export const settingsPatchSchema = settingsSchema
+  .pick({ autoPlayTerm: true, autoPlayDefinition: true, speechRate: true, soundEffects: true, theme: true })
+  .partial()
+  .strict();
 
 export const DEFAULT_SETTINGS: Settings = settingsSchema.parse({});
 
-/** Merge stored (possibly stale/partial) settings with defaults, dropping invalid values. */
+/** Merge stored (possibly stale/partial) settings with defaults: only editable values are kept, invalid ones dropped. */
 export function resolveSettings(stored: unknown): Settings {
   const out: Record<string, unknown> = { ...DEFAULT_SETTINGS };
   if (stored && typeof stored === "object") {
     for (const [k, v] of Object.entries(stored)) {
+      if (!(EDITABLE_SETTINGS as readonly string[]).includes(k)) continue;
       const field = settingsSchema.shape[k as keyof Settings];
       if (field && field.safeParse(v).success) out[k] = v;
     }

@@ -35,8 +35,6 @@ export type CardDTO = {
   imageSource: string | null;
   /** This word doesn't need a picture (AI/heuristic decision, or the user removed it). */
   noImage: boolean;
-  /** Topic group suggested by AI. */
-  groupLabel: string | null;
   /** Definite article (der/die/das, el/la, …) and plural form, for the Articles & plurals game. */
   article: string | null;
   plural: string | null;
@@ -92,7 +90,6 @@ const cardColumns = {
   imageSource: schema.cards.imageSource,
   noImage: schema.cards.noImage,
   imageQuery: schema.cards.imageQuery,
-  groupLabel: schema.cards.groupLabel,
   article: schema.cards.article,
   plural: schema.cards.plural,
   grammarChecked: schema.cards.grammarChecked,
@@ -119,7 +116,6 @@ export function toCardDTO(c: CardRow, p: CardProgress | null | undefined): CardD
     imageAttribution: c.imageAttribution,
     imageSource: c.imageSource,
     noImage: c.noImage,
-    groupLabel: c.groupLabel,
     article: c.article,
     plural: c.plural,
     grammarChecked: c.grammarChecked,
@@ -150,7 +146,6 @@ export function toStudyCard(deck: Pick<Deck, "id" | "termLang" | "definitionLang
     example: c.example,
     imageUrl: c.displayImageUrl,
     imageAttribution: c.imageAttribution,
-    group: c.groupLabel,
     article: c.article,
     plural: c.plural,
     termLang: deck.termLang,
@@ -307,8 +302,7 @@ export async function upsertCards(deckId: string, inputs: CardInput[]): Promise<
         }
         const before = byId.get(c.id)!;
         if (before.term !== c.term || before.definition !== c.definition) {
-          // The word changed: AI suggestions (topic, image keyword) must be recomputed.
-          update.groupLabel = null;
+          // The word changed: an old image keyword no longer fits.
           update.imageQuery = null;
         }
         if (before.term !== c.term) {
@@ -378,7 +372,6 @@ export async function duplicateDeck(userId: string, deckId: string): Promise<Dec
           imageSource: c.imageSource,
           noImage: c.noImage,
           imageQuery: c.imageQuery,
-          groupLabel: c.groupLabel,
           article: c.article,
           plural: c.plural,
           grammarChecked: c.grammarChecked,
@@ -513,15 +506,6 @@ export async function decksWithDueCards(userId: string, now = new Date()) {
       and(eq(schema.decks.userId, userId), gte(schema.cardProgress.stage, 1), lte(schema.cardProgress.dueAt, now)),
     );
   return rows.map((r) => r.deck);
-}
-
-/** Cards that still need the AI "organize" pass (no topic yet). */
-export async function cardsNeedingOrganize(deckId: string) {
-  const db = await getDb();
-  return db
-    .select({ id: schema.cards.id })
-    .from(schema.cards)
-    .where(and(eq(schema.cards.deckId, deckId), sql`${schema.cards.groupLabel} is null`));
 }
 
 export async function cardsWithoutImages(deckId: string) {

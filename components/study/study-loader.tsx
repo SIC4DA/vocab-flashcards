@@ -9,6 +9,9 @@ import { MatchGame } from "./match-game";
 import { StudySession, type QueuePayload } from "./session";
 import { TestRunner } from "./test-runner";
 
+/** How many times "Keep going" / "Start the next set" can extend Learn in a day (matches the queue route). */
+const MAX_BONUS = 6;
+
 export type StudyMode = "learn" | "flashcards" | "write" | "listen" | "match" | "test" | "daily" | "grammar";
 
 function SessionSkeleton() {
@@ -83,7 +86,7 @@ export function StudyLoader({
           title={title}
           exitHref={exitHref}
           onKeepGoing={
-            (mode === "learn" && bonus < 3) || mode === "daily"
+            (mode === "learn" && bonus < MAX_BONUS) || mode === "daily"
               ? () => {
                   setPayload(null);
                   setBonus((b) => b + 1);

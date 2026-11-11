@@ -57,36 +57,38 @@ test("without AI, verbs like 'to spell' get no picture", async ({ page }) => {
   await expect(table.filter({ hasText: "to spell" }).getByTitle("No picture needed")).toBeVisible();
 });
 
-test("with a Gemini key: Organize with AI sets topics and removes pictures that don't help", async ({ page }) => {
-  await registerAPI(page, uid("Organiser_"));
-  const { deckId } = await germanDeck(page, [
+test("no Organize with AI; a word without a picture shows no empty image box", async ({ page }) => {
+  await registerAPI(page, uid("NoBox_"));
+  const { deckId, cards } = await germanDeck(page, [
     { term: "das Handtuch", definition: "towel" },
     { term: "die Wurst", definition: "sausage" },
     { term: "nachdenken", definition: "to reflect" },
   ]);
-  // Pretend all three already had automatic pictures (as in decks made before this feature).
-  const cards = (await (await page.request.get(`/api/decks/${deckId}`)).json()).cards as { id: string; term: string; definition: string }[];
   await page.request.put(`/api/decks/${deckId}/cards`, {
-    data: { cards: cards.map((c, i) => ({ ...c, imageUrl: `https://images.e2e.test/thumb/${i}.png`, imageSource: "auto" })) },
+    data: {
+      cards: cards.map((c, i) =>
+        c.term === "nachdenken"
+          ? { ...c, imageUrl: null, noImage: true }
+          : { ...c, imageUrl: `https://images.e2e.test/thumb/${i}.png`, imageSource: "auto" },
+      ),
+    },
   });
   expect((await page.request.put("/api/account/gemini-key", { data: { apiKey: VALID_KEY } })).status()).toBe(200);
 
   await page.goto(`/decks/${deckId}`);
-  await page.getByTestId("organize-ai").click();
-  await expect(page.getByTestId("toast")).toContainText("Deck organised");
-  const row = (text: string) => page.getByTestId("card-table-row").filter({ hasText: text });
-  await expect(row("to reflect").getByTestId("card-topic")).toHaveText("Everyday verbs");
-  await expect(row("to reflect").locator("img")).toHaveCount(0);
-  await expect(row("towel").getByTestId("card-topic")).toHaveText("Home");
-  await expect(row("towel").locator("img")).toHaveCount(1);
+  await expect(page.getByTestId("deck-title")).toBeVisible();
+  await expect(page.getByText("Organize with AI")).toHaveCount(0);
+  await page.getByTestId("deck-menu").click();
+  await expect(page.getByRole("menuitem")).toHaveText(["Duplicate", "Export CSV", "Reset progress", "Delete deck"]);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
 
-  // In study mode, a word without a picture shows no empty image box
   await page.goto(`/decks/${deckId}/study/write`);
   for (let i = 0; i < 3; i++) {
     const def = await page.getByTestId("prompt-definition").textContent();
     const imgs = await page.getByTestId("question").locator("img").count();
     expect(imgs).toBe(def === "to reflect" ? 0 : 1);
-    const term = cards.find((c) => c.definition === def)!.term;
+    const term = cards.find((c) => (c as unknown as { definition: string }).definition === def)!.term;
     await page.getByTestId("answer-input").fill(term);
     await page.keyboard.press("Enter");
     await page.getByTestId("continue").click();

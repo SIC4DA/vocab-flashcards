@@ -62,7 +62,6 @@ export default async function HelpPage() {
         <p className="text-muted">
           Everything you need to know: how words move from “new” to “learned”, what each study mode does, and how to set
           things up.
-          {user && " Numbers on this page use your current settings."}
         </p>
       </header>
 
@@ -127,8 +126,8 @@ export default async function HelpPage() {
       </div>
       <ul className="list-disc space-y-2 pl-6">
         <li>
-          <b>Moving up:</b> a word moves up one stage after you answer it correctly <b>{times}</b> at its current stage
-          (setting “Correct answers to move up a step”, currently <b>{n}</b>). So a word needs at least{" "}
+          <b>Moving up:</b> a word moves up one stage after you answer it correctly <b>{times}</b> at its current stage.
+          So a word needs at least{" "}
           <b>{minAnswers} correct answers</b> after you first see it, spread over at least <b>{daysToMaster} days</b>{" "}
           (see the daily session below).
         </li>
@@ -142,8 +141,8 @@ export default async function HelpPage() {
           drops back to <b>Written</b> and must be written correctly again to become Mastered.
         </li>
         <li>
-          You can see each word’s stage, next review date and right/wrong counts in the table on the deck page, and reset
-          a single word or the whole deck there.
+          You can see each word’s stage, next review date and right/wrong counts in the table on the deck page. You can
+          reset a single word there, or the whole deck from the <b>⋯</b> menu.
         </li>
       </ul>
 
@@ -156,38 +155,53 @@ export default async function HelpPage() {
         <li>
           <b>When you press Learn</b>, the app picks today’s words, in this order: <b>reviews</b> (mastered words that are
           due again), <b>words you’re still learning</b>, then up to <b>{s.newPerDay} new words</b> from the current
-          topic.
+          set.
         </li>
         <li>
           It asks them in <b>rounds of {s.roundSize}</b>: one question per word per round, at that word’s step on the
           ladder. A round summary shows what moved up and what you missed.
         </li>
         <li>
-          Each word may climb <b>{steps} step{steps === 1 ? "" : "s"} per day</b> (setting “Steps per word per day”). A new
+          Each word may climb <b>{steps} step{steps === 1 ? "" : "s"} per day</b>. A new
           word on day 1: see it → multiple choice → listening. Day 2: dictation → writing → <b>Mastered</b>. A review only
           needs one correct answer.
         </li>
         <li>
-          When every word has had its practice, you see <b>“Done for today!”</b>. You can stop there (recommended) or press{" "}
-          <b>Keep going anyway</b> for a bonus round (one more step per word, a few more new words).
+          When every word has had its practice, the session ends with your results. If you just finished a set, it says so
+          — <b>“Set 1 complete!”</b> — and <b>Start Set 2</b> brings in the next 8 words right away. Otherwise{" "}
+          <b>Keep going</b> gives every word one more step. Stopping and coming back tomorrow works just as well: spacing
+          is what makes words stick.
         </li>
       </ol>
-      <h3 className="pt-2 text-xl font-semibold">Topics: one group at a time</h3>
+      <h3 className="pt-2 text-xl font-semibold">Sets: 8 words at a time</h3>
       <ul className="list-disc space-y-2 pl-6">
         <li>
-          Your deck is split into <b>topics</b>. With your Gemini key they’re real themes (e.g. “Kitchen”, “Food”); without
-          one, the deck is split into <b>sets of 8 words</b> in the order you entered them.
+          Your deck is split into <b>sets of 8 words</b>, in the order you entered them — so put words that belong together
+          next to each other.
         </li>
         <li>
-          New words come from <b>one topic at a time</b>. The next topic starts when all its words have been seen and at
-          least <b>3 out of 4 can be written</b>. Hard words from earlier topics keep being practised, so they never block
-          you.
+          New words come from <b>one set at a time</b>. A set is complete when all its words have been seen and at least{" "}
+          <b>3 out of 4 can be written</b>. Hard words keep being practised, so they never block you.
         </li>
         <li>
-          Finished topics keep coming back as reviews, so over time your sessions become a <b>mix of every topic</b>.
+          Finished sets keep coming back as reviews, so over time your sessions become a <b>mix of every set</b>.
+        </li>
+        <li>The deck page shows every set with its progress and which one you’re learning now.</li>
+      </ul>
+      <h3 className="pt-2 text-xl font-semibold">Articles and plurals in Learn</h3>
+      <ul className="list-disc space-y-2 pl-6">
+        <li>
+          Nouns are shown with their article in colour — <b className="text-accent">der</b> (masculine),{" "}
+          <b className="text-margin">die</b> (feminine), <b className="text-success">das</b> (neuter); the same blue/red for
+          el/la, le/la, il/la, o/a — and with their plural on the back of the card (<i>das Buch · die Bücher</i>).
         </li>
         <li>
-          The deck page shows every topic with its progress and which one you’re learning now.
+          When you <b>write a noun from its meaning</b>, the article is part of the answer: <i>Buch</i> alone counts as
+          “Almost — the article is part of the word”. So by the time a noun is Mastered, you know its gender too.
+        </li>
+        <li>
+          The plural is practised in the separate <b>Articles &amp; plurals</b> game, which uses the nouns you’ve already met
+          in Learn.
         </li>
       </ul>
 
@@ -226,13 +240,13 @@ export default async function HelpPage() {
       <H2 id="modes">Study modes</H2>
       <dl className="space-y-3">
         {[
-          ["🧠 Learn", "The main mode: your daily session (see above). It picks today’s words, asks the right question for each word’s step, and ends with “Done for today”. New words come one topic at a time."],
+          ["🧠 Learn", "The main mode: your daily session (see above). It picks today’s words, asks the right question for each word’s step, and ends with your results (or “Set 1 complete! Start Set 2”). New words come one set at a time."],
           ["🃏 Flashcards", "Flip cards (tap, click or Space). Sort them with “Know it” (→) or “Still learning” (←), or swipe on a phone. At the end you can study only the still-learning ones again. Options: shuffle, definition first."],
           ["✍️ Write", "Every word as a writing question in random order. Wrong ones come back at the end."],
           ["🎧 Listen", "Dictation: you only hear the word (🔊 replay, 🐢 slow) and type it."],
           ["Articles & plurals", "A separate game for the gender and the plural of each noun (see below). German, French, Spanish, Italian and Portuguese decks."],
           ["🎯 Match", "Match 6 words with their meanings as fast as you can. Wrong pairs add 1 second. Your best time per deck is saved."],
-          ["📝 Test", "A generated exam: choose how many questions and which types (multiple choice, write, listen & write, true/false). You get a score, pass/fail (pass mark in Settings), and can retake only the ones you missed."],
+          ["📝 Test", "A generated exam: choose how many questions and which types (multiple choice, write, listen & write, true/false). You get a score, pass/fail (pass mark {s.passMark}%), and can retake only the ones you missed."],
           ["📅 Daily review", "From the dashboard: about 10 minutes with words you already know, across all your decks. Finishing it keeps your streak."],
         ].map(([t, d]) => (
           <div key={t} className="panel p-4">
@@ -312,8 +326,7 @@ export default async function HelpPage() {
       <ul className="list-disc space-y-2 pl-6">
         <li>Upper/lower case, extra spaces and punctuation at the end don’t matter.</li>
         <li>
-          <b>Accents:</b> typing <i>cafe</i> for <i>café</i> counts as correct and shows “Almost — watch the accents”. Turn on{" "}
-          <b>Strict accents</b> in Settings to count it as wrong.
+          <b>Accents:</b> typing <i>cafe</i> for <i>café</i> counts as correct and shows “Almost — watch the accents”.
         </li>
         <li>
           <b>Small typos</b> (1 letter wrong in words of 5+ letters, 2 in words of 10+) show “Almost right” with the
@@ -324,7 +337,8 @@ export default async function HelpPage() {
           accepted.
         </li>
         <li>
-          <b>Articles:</b> turn on <b>Ignore articles</b> to accept <i>casa</i> for <i>la casa</i>.
+          <b>Articles:</b> when you write a noun of German, French, Spanish, Italian or Portuguese from its meaning, the
+          article counts (<i>das Buch</i>, not <i>Buch</i>). When you write what you hear, you write what was said.
         </li>
         <li>
           A <b>special-characters bar</b> (á, ñ, ü, ß, ç…) appears under the answer box for your term language.
@@ -343,20 +357,19 @@ export default async function HelpPage() {
               plays.
             </li>
             <li>
-              <b>Gemini’s natural voice</b> — only with your own Gemini key, when you turn on “Prefer cloud voice” or your
-              device has no voice for the language. Gemini’s free voice quota is small, so each clip is generated once and
+              <b>Gemini’s natural voice</b> — only with your own Gemini key, when your device has no voice for the
+              language. Gemini’s free voice quota is small, so each clip is generated once and
               cached; when the quota runs out the device voice takes over automatically.
             </li>
             <li>
-              <b>Your device’s voice</b> for everything else (sentences, rare words). The app picks the best-sounding voice your
+              <b>Your device’s voice</b> for everything else (phrases, rare words). The app picks the best-sounding voice your
               device has (for example “Google Deutsch” in Chrome, or an “Enhanced” voice on Apple devices). Installing a better
               voice in your system’s language settings improves this too.
             </li>
           </ol>
         </li>
         <li>
-          Press 🔊 or <kbd>P</kbd> any time; 🐢 plays slowly. You can turn recordings off in Settings (“Use native-speaker
-          recordings”).
+          Press 🔊 or <kbd>P</kbd> any time; 🐢 plays slowly.
         </li>
         <li>
           Browsers only allow sound after you’ve clicked or tapped something on the page, so auto-play may stay silent on a
@@ -371,12 +384,8 @@ export default async function HelpPage() {
       </p>
       <ul className="list-disc space-y-2 pl-6">
         <li>
-          <b>With your Gemini key</b>, when you save a deck, Gemini looks at each word and decides whether a picture helps,
-          picks a good search word for it, and sorts the words into topics. For decks you made earlier, press{" "}
-          <b>Organize with AI</b> on the deck page — it also removes automatic pictures from words that don’t need one.
-        </li>
-        <li>
-          <b>Without a key</b>, words whose meaning is an English verb (“to …”) get no picture; everything else gets one.
+          Words whose meaning is an English verb (“to …”) or another word you can’t photograph get no picture; everything
+          else gets one when you save. You can pick a different one, upload your own, or remove it in the editor.
         </li>
         <li>
           Pictures are openly licensed (Openverse, then Wikimedia Commons). In the editor, click the picture box to{" "}
@@ -413,10 +422,7 @@ export default async function HelpPage() {
         <li>
           <b>Smart pictures</b>: only words that benefit get one, found with a better search word.
         </li>
-        <li>
-          <b>Topics</b>: words are grouped by theme, and Learn introduces new words topic by topic.
-        </li>
-        <li>A <b>cloud voice</b> when your device has no voice for a language (or always, with “Prefer cloud voice”).</li>
+        <li>A <b>cloud voice</b> when your device has no voice for a language.</li>
         <li>
           <b>Articles &amp; plurals</b> for French, Spanish, Italian and Portuguese nouns (German uses Wiktionary).
         </li>
@@ -430,20 +436,16 @@ export default async function HelpPage() {
       </p>
 
       <H2 id="settings">Settings explained</H2>
+      <p className="text-sm text-muted">
+        Settings only cover sound and looks. How Learn paces words (one correct answer per step, {steps} steps per word per
+        day, {s.newPerDay} new words a day, rounds of {s.roundSize}) and how answers are checked are the same for everyone:
+        they’re tuned so words stick without endless sessions.
+      </p>
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[14rem_1fr]">
         {[
           ["Auto-play term / definition", "Speak the word (or the meaning) automatically when a card appears."],
           ["Speech rate", "How fast words are spoken (0.5–1.5×)."],
-          ["Use native-speaker recordings", "Play real recordings from Wiktionary when they exist (recommended)."],
-          ["Prefer cloud voice", "For words without a recording, use Gemini’s voice instead of your device’s (only with your Gemini key)."],
           ["Sound effects", "Short tones for right and wrong answers."],
-          ["Strict accents", "Count answers with wrong or missing accents as wrong."],
-          ["Ignore articles", "Accept answers without “the / el / la / der / le …”."],
-          [`Correct answers to move up a step (now ${n})`, "How many right answers in a row move a word up the ladder (1–3)."],
-          [`New words per day (now ${s.newPerDay})`, "How many new words Learn introduces per day."],
-          [`Steps per word per day (now ${steps})`, "How far one word can climb in a day’s Learn session."],
-          [`Learn round size (now ${s.roundSize})`, "How many words are in each Learn round."],
-          [`Test pass mark (now ${s.passMark}%)`, "The score you need to pass a Test."],
           ["Theme", "Light, dark, or follow your device."],
         ].map(([t, d]) => (
           <div key={t} className="contents">

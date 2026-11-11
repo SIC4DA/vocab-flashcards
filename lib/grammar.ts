@@ -144,84 +144,108 @@ function shuffle<T>(arr: T[], rand: () => number): T[] {
 
 /* --------------------------------- tips --------------------------------- */
 
-type Rule = { re: RegExp; tip: string };
+/**
+ * Rule-of-thumb tips shown after a mistake. Each rule is narrow on purpose (a tip that's wrong for the word
+ * on screen is worse than no tip) and names its common exceptions. Checked against standard grammar
+ * references; see tests/unit/grammar-daily.test.ts for the words each rule must and must not match.
+ */
+type Rule = { re: RegExp; tip: string; article?: string[] };
 
 const ARTICLE_RULES: Record<string, Rule[]> = {
   de: [
-    { re: /(ung|heit|keit|schaft|tion|sion|tät|ik|ei|ie|ur|enz|anz)$/i, tip: "Nouns ending in -ung, -heit, -keit, -schaft, -ion, -tät, -ik, -ei, -ie are almost always die." },
-    { re: /(chen|lein)$/i, tip: "Nouns ending in -chen and -lein (little things) are always das." },
-    { re: /(ment|um|tum|nis)$/i, tip: "Nouns ending in -ment, -um and -tum are usually das." },
-    { re: /(ling|ismus|or|ig|ich|ant|ist|eur)$/i, tip: "Nouns ending in -ling, -ismus, -or, -ig, -ich, -ist, -eur are usually der." },
-    { re: /e$/i, tip: "Most nouns ending in -e are die (but watch out: der Junge, das Auge)." },
-    { re: /^ge/i, tip: "Many nouns starting with Ge- are das (das Gemüse, das Gebäude)." },
+    // Diminutives; the consonant before -chen leaves out der Kuchen, der Knochen, der Rachen.
+    { re: /([^aeiouäöü]chen|lein)$/i, tip: "Nouns ending in the diminutive -chen or -lein are always das (das Mädchen, das Brötchen)." },
+    { re: /(ung|heit|keit|schaft|tion|sion|tät|erei|.{3}enz)$/i, tip: "Nouns ending in -ung, -heit, -keit, -schaft, -tion, -sion, -tät, -erei and -enz are die (die Zeitung, die Freiheit) — only a few short words like der Sprung break the rule." },
+    { re: /(ismus|ling)$/i, tip: "Nouns ending in -ismus and -ling are der (der Tourismus, der Frühling)." },
+    { re: /^.{3,}(ist|ant|eur)$/i, tip: "People and things ending in -ist, -ant and -eur are usually der (der Polizist, der Elefant, der Friseur) — but das Restaurant." },
+    { re: /^.{2,}(or|ig)$/i, tip: "Nouns ending in -or and -ig are usually der (der Motor, der König), with a few exceptions like das Tor." },
+    { re: /(ment|[^at]um)$/i, tip: "Nouns ending in -ment and Latin nouns ending in -um are usually das (das Dokument, das Museum) — but der Moment." },
+    { re: /^ge/i, tip: "Many nouns starting with Ge- are das (das Gemüse, das Gebäude, das Geld), but not all (die Geschichte, der Geschmack)." },
+    { re: /e$/i, tip: "Most nouns ending in -e are die (die Lampe), but not all: der Junge, der Name, das Auge, das Ende." },
   ],
   es: [
-    { re: /(ción|sión|dad|tad|tud|umbre)$/i, tip: "Nouns ending in -ción, -sión, -dad, -tad, -tud are la." },
-    { re: /(ma)$/i, tip: "Many nouns ending in -ma come from Greek and are el (el problema, el tema)." },
-    { re: /o$/i, tip: "Nouns ending in -o are usually el (exceptions: la mano, la foto, la moto)." },
-    { re: /a$/i, tip: "Nouns ending in -a are usually la (exceptions: el día, el mapa)." },
+    { re: /(ción|sión|dad|tad|tud|umbre)$/i, tip: "Nouns ending in -ción, -sión, -dad, -tad, -tud and -umbre are la (la canción, la ciudad)." },
+    { re: /ma$/i, tip: "Words ending in -ma are split: many from Greek are el (el problema, el tema, el sistema), others are la (la cama, la forma)." },
+    { re: /o$/i, tip: "Nouns ending in -o are usually el (exceptions: la mano, la foto, la moto, la radio)." },
+    { re: /a$/i, tip: "Nouns ending in -a are usually la (exceptions: el día, el mapa, el planeta)." },
   ],
   fr: [
-    { re: /^[aeiouhéèêàâîôûœ]/i, tip: "Before a vowel or silent h, le and la both become l’." },
-    { re: /(tion|sion|té|ette|ence|ance|ure|ise)$/i, tip: "Nouns ending in -tion, -sion, -té, -ette, -ence, -ance are usually la." },
-    { re: /(ment|age|eau|isme|oir|et)$/i, tip: "Nouns ending in -ment, -age, -eau, -isme, -oir are usually le (exceptions: la plage, la page)." },
+    { re: /^[aeiouyéèêàâîôûœ]/i, tip: "Before a vowel or a silent h, le and la both become l’ (l’arbre, l’école, l’homme)." },
+    { re: /(tion|sion|ette|ance|ure)$/i, tip: "Nouns ending in -tion, -sion, -ette, -ance and -ure are usually la (la nation, la voiture)." },
+    { re: /(té|ence)$/i, tip: "Nouns ending in -té and -ence are usually la (la liberté, la science), but le côté, le comité and le silence are masculine." },
+    { re: /(ment|age|isme|oir)$/i, tip: "Nouns ending in -ment, -age, -isme and -oir are usually le (le moment, le fromage), but la plage, la page and l’image are feminine." },
+    { re: /eau$/i, tip: "Nouns ending in -eau are usually le (le bateau, le gâteau), but la peau and l’eau are feminine." },
   ],
   it: [
-    { re: /^[aeiou]/i, tip: "Before a vowel, il and la both become l’." },
-    { re: /^(s[bcdfgklmnpqrstvz]|z|gn|ps|x|y)/i, tip: "Masculine nouns starting with s + consonant, z, gn or ps take lo (lo studente, lo zaino)." },
-    { re: /(zione|sione|tà|tù)$/i, tip: "Nouns ending in -zione, -sione, -tà are feminine: la." },
-    { re: /o$/i, tip: "Nouns ending in -o are usually masculine: il (or lo)." },
-    { re: /a$/i, tip: "Nouns ending in -a are usually feminine: la (exceptions: il problema, il tema)." },
+    { re: /^[aeiouàèéìòù]/i, tip: "Before a vowel, lo and la become l’ (l’amico, l’isola)." },
+    { re: /(zione|sione|tà|tù)$/i, tip: "Nouns ending in -zione, -sione, -tà and -tù are feminine: la (la stazione, la città)." },
+    { re: /^(s[bcdfgklmnpqrstvz]|z|gn|ps|x|y)/i, tip: "Masculine nouns starting with s + consonant, z, gn, ps, x or y take lo instead of il (lo studente, lo zaino)." },
+    { re: /o$/i, tip: "Nouns ending in -o are usually masculine: il (or lo) — exceptions: la mano, la radio, la foto." },
+    { re: /a$/i, tip: "Nouns ending in -a are usually feminine: la (exceptions: il problema, il tema, il papà)." },
   ],
   pt: [
-    { re: /(ção|são|dade|agem|ice)$/i, tip: "Nouns ending in -ção, -são, -dade, -agem are a." },
-    { re: /(ma)$/i, tip: "Many nouns ending in -ma are o (o problema, o sistema)." },
-    { re: /o$/i, tip: "Nouns ending in -o are usually o." },
-    { re: /a$/i, tip: "Nouns ending in -a are usually a (exceptions: o dia, o mapa)." },
+    { re: /(ção|são|dade|agem|ice)$/i, tip: "Nouns ending in -ção, -são, -dade, -agem and -ice are a (a canção, a cidade, a viagem)." },
+    { re: /ma$/i, tip: "Words ending in -ma are split: many from Greek are o (o problema, o tema, o sistema), others are a (a cama, a forma)." },
+    { re: /o$/i, tip: "Nouns ending in -o are usually o (exceptions: a foto, a moto, a tribo)." },
+    { re: /a$/i, tip: "Nouns ending in -a are usually a (exceptions: o dia, o mapa, o planeta)." },
   ],
 };
 
 const PLURAL_RULES: Record<string, Rule[]> = {
   de: [
-    { re: /(ung|heit|keit|schaft|tion|tät|ei|in)$/i, tip: "Feminine endings like -ung, -heit, -keit, -ion, -tät add -en (-in → -innen)." },
-    { re: /(chen|lein)$/i, tip: "-chen and -lein nouns don't change in the plural (das Mädchen → die Mädchen)." },
-    { re: /(er|el|en)$/i, tip: "Masculine and neuter nouns ending in -er, -el, -en often stay the same, sometimes with an umlaut (der Vater → die Väter)." },
-    { re: /e$/i, tip: "Nouns ending in -e usually add -n (die Lampe → die Lampen)." },
-    { re: /[aiouy]$/i, tip: "Nouns ending in a vowel other than -e (and many loanwords) add -s (das Auto → die Autos)." },
-    { re: /./, tip: "Short masculine nouns often add -e, many with an umlaut; short neuter nouns often add -er with an umlaut (das Buch → die Bücher)." },
+    { re: /([^aeiouäöü]chen|lein)$/i, tip: "Diminutives ending in -chen and -lein don't change (das Mädchen → die Mädchen)." },
+    { re: /(ung|heit|keit|schaft|tion|sion|tät|erei)$/i, tip: "Nouns ending in -ung, -heit, -keit, -schaft, -ion, -tät and -erei add -en (die Zeitung → die Zeitungen)." },
+    { re: /in$/i, article: ["die"], tip: "Female forms ending in -in add -nen (die Lehrerin → die Lehrerinnen)." },
+    { re: /e$/i, tip: "Nouns ending in -e usually add -n (die Lampe → die Lampen, der Junge → die Jungen)." },
+    { re: /(el|er)$/i, article: ["die"], tip: "Feminine nouns ending in -el and -er add -n (die Regel → die Regeln, die Schwester → die Schwestern); only die Mutter and die Tochter take an umlaut instead (Mütter, Töchter)." },
+    { re: /(el|er|en)$/i, article: ["der", "das"], tip: "Masculine and neuter nouns ending in -el, -er and -en usually stay the same, sometimes with an umlaut (der Lehrer → die Lehrer, der Vater → die Väter)." },
+    // Not -au/-ei (die Frau → Frauen, das Ei → Eier).
+    { re: /(?<![ae])[aiouy]$/i, tip: "Nouns ending in -a, -i, -o, -u or -y, and many loanwords, usually add -s (das Auto → die Autos, das Handy → die Handys)." },
+    { re: /./, article: ["der"], tip: "Many masculine nouns add -e, often with an umlaut (der Hund → die Hunde, der Stuhl → die Stühle)." },
+    { re: /./, article: ["das"], tip: "Short neuter nouns often add -er with an umlaut (das Buch → die Bücher, das Haus → die Häuser) or just -e (das Jahr → die Jahre)." },
+    { re: /./, article: ["die"], tip: "Feminine nouns usually add -en or -n (die Frau → die Frauen); some short ones add -e with an umlaut (die Hand → die Hände)." },
   ],
   es: [
     { re: /z$/i, tip: "Nouns ending in -z change to -ces (el lápiz → los lápices)." },
-    { re: /[aeiouáéó]$/i, tip: "Nouns ending in a vowel add -s." },
-    { re: /./, tip: "Nouns ending in a consonant add -es (el árbol → los árboles)." },
+    { re: /[aeiouáéíóú]$/i, tip: "Nouns ending in a vowel add -s (el libro → los libros)." },
+    { re: /s$/i, tip: "Nouns ending in -s add -es when the last syllable is stressed (el mes → los meses) and don't change when it isn't (el lunes → los lunes)." },
+    { re: /./, tip: "Nouns ending in a consonant add -es (el árbol → los árboles); a written accent can disappear or appear (la canción → las canciones, el joven → los jóvenes)." },
   ],
   fr: [
-    { re: /(eau|eu|au)$/i, tip: "Nouns ending in -eau, -eu, -au add -x (le gâteau → les gâteaux)." },
-    { re: /al$/i, tip: "Nouns ending in -al usually become -aux (le journal → les journaux)." },
-    { re: /[sxz]$/i, tip: "Nouns already ending in -s, -x or -z don't change." },
-    { re: /./, tip: "Most nouns just add -s (silent)." },
+    { re: /(eau|eu|au)$/i, tip: "Nouns ending in -eau, -eu and -au add -x (le gâteau → les gâteaux), with a few exceptions like les pneus." },
+    { re: /al$/i, tip: "Nouns ending in -al usually become -aux (le journal → les journaux), except a few like les festivals." },
+    { re: /[sxz]$/i, tip: "Nouns already ending in -s, -x or -z don't change (le bras → les bras)." },
+    { re: /./, tip: "Most nouns just add a silent -s (le livre → les livres)." },
   ],
   it: [
-    { re: /o$/i, tip: "Nouns ending in -o change to -i (il libro → i libri)." },
-    { re: /a$/i, tip: "Feminine nouns ending in -a change to -e (la casa → le case)." },
-    { re: /e$/i, tip: "Nouns ending in -e change to -i (il fiore → i fiori)." },
+    { re: /(ca|ga)$/i, tip: "Feminine nouns ending in -ca and -ga keep the hard sound: -che, -ghe (l’amica → le amiche)." },
+    { re: /(co|go)$/i, tip: "Nouns ending in -co and -go usually become -chi, -ghi (il gioco → i giochi), but some become -ci, -gi (l’amico → gli amici)." },
+    { re: /o$/i, tip: "Nouns ending in -o change to -i (il libro → i libri); a few irregular ones like l’uovo → le uova don't." },
+    { re: /a$/i, article: ["la"], tip: "Feminine nouns ending in -a change to -e (la casa → le case)." },
+    { re: /a$/i, tip: "Masculine nouns ending in -a change to -i (il problema → i problemi); feminine ones change to -e (la casa → le case)." },
+    { re: /e$/i, tip: "Nouns ending in -e change to -i (il fiore → i fiori, la chiave → le chiavi)." },
     { re: /./, tip: "Nouns ending in a consonant or an accented vowel don't change (il film → i film, la città → le città)." },
   ],
   pt: [
-    { re: /ão$/i, tip: "Nouns ending in -ão usually become -ões (sometimes -ães or -ãos)." },
+    { re: /ão$/i, tip: "Nouns ending in -ão usually become -ões (a canção → as canções); some take -ães or -ãos (o pão → os pães, a mão → as mãos)." },
     { re: /m$/i, tip: "Nouns ending in -m change to -ns (o homem → os homens)." },
-    { re: /l$/i, tip: "Nouns ending in -l usually change to -is (o animal → os animais)." },
-    { re: /[rsz]$/i, tip: "Nouns ending in -r, -s or -z usually add -es." },
-    { re: /./, tip: "Nouns ending in a vowel add -s." },
+    { re: /l$/i, tip: "Nouns ending in -l change to -is, with an accent on some (o animal → os animais, o papel → os papéis)." },
+    { re: /s$/i, tip: "Nouns ending in -s add -es when the last syllable is stressed (o mês → os meses) and don't change when it isn't (o lápis → os lápis)." },
+    { re: /[rz]$/i, tip: "Nouns ending in -r and -z add -es (a flor → as flores, a luz → as luzes)." },
+    { re: /./, tip: "Nouns ending in a vowel add -s (o livro → os livros)." },
   ],
 };
 
+const findTip = (rules: Rule[] | undefined, noun: string, article: string | null | undefined) =>
+  rules?.find((r) => r.re.test(noun) && (!r.article || (article != null && r.article.includes(article))))?.tip ?? null;
+
 export function articleTip(noun: string, lang: string): string | null {
-  return ARTICLE_RULES[lc(lang)]?.find((r) => r.re.test(noun))?.tip ?? null;
+  return findTip(ARTICLE_RULES[lc(lang)], noun, null);
 }
 
-export function pluralTip(noun: string, lang: string): string | null {
-  return PLURAL_RULES[lc(lang)]?.find((r) => r.re.test(noun))?.tip ?? null;
+/** The plural tip can depend on the noun's gender (German -er/-el, Italian -a). */
+export function pluralTip(noun: string, lang: string, article?: string | null): string | null {
+  return findTip(PLURAL_RULES[lc(lang)], noun, article);
 }
 
 /* --------------------------------- game --------------------------------- */
@@ -287,4 +311,37 @@ export function fullForms(noun: string, article: string | null, plural: string |
   if (!hasPlural(plural)) return plural ? `${sg} (no plural)` : sg;
   const pa = pluralArticle(article, lang);
   return `${sg} → ${pa ? `${pa} ` : ""}${plural!.trim()}`;
+}
+
+/* ---------------------------- in Learn / cards ---------------------------- */
+
+const GENDER_OF: Record<string, Record<string, "m" | "f" | "n">> = {
+  de: { der: "m", die: "f", das: "n" },
+  es: { el: "m", la: "f" },
+  fr: { le: "m", la: "f" },
+  it: { il: "m", lo: "m", la: "f" },
+  pt: { o: "m", a: "f" },
+};
+
+/** Grammatical gender shown by a definite article (null for l', which hides it). */
+export function articleGender(article: string | null, lang: string): "m" | "f" | "n" | null {
+  return article ? (GENDER_OF[lc(lang)]?.[article] ?? null) : null;
+}
+
+/** How a card's word is shown and asked: its article (from the term or stored), the bare noun and the full form. */
+export function nounForms(card: { term: string; article?: string | null; plural?: string | null }, lang: string) {
+  const split = splitArticle(card.term, lang);
+  const article = split.article ?? (card.article && genderArticles(lang).includes(card.article) ? card.article : null);
+  const full = split.article || !article ? card.term.trim() : article.endsWith("'") ? `${article}${split.noun}` : `${article} ${split.noun}`;
+  const plural = hasPlural(card.plural) ? card.plural!.trim() : null;
+  const pa = plural ? pluralArticle(article, lang) : null;
+  return {
+    article,
+    noun: split.noun,
+    /** The word with its article: what a writing question expects ("das Buch"). */
+    full,
+    plural,
+    /** "die Bücher" */
+    pluralFull: plural ? (pa ? `${pa} ${plural}` : plural) : null,
+  };
 }

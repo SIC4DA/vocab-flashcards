@@ -17,7 +17,7 @@ Pictures and pronunciation are automatic and need no API keys. AI extras are opt
 - **Accounts** — username + password (no email). Sessions are signed HTTP-only cookies. Brute-force lockout after 10 failed logins in 15 minutes.
 - **Decks & cards** — 7 languages — English, Spanish, French, German, Italian, Portuguese and Arabic (with right-to-left support), drag-and-drop or ↑/↓ reordering, undo on delete, Tab-to-add-row, bulk import (tab, comma or ` - `) with live preview, CSV export, duplicate/delete deck.
 - **Smart images** — pictures only where they help (objects, food, colours…, not "to spell"). Found on Openverse (Wikimedia Commons as fallback) when you save; with a Gemini key, AI decides per word and picks the search keyword. Pick another, upload your own (resized to 512 px WebP in the browser), paste a URL or remove it. Licence attribution is shown on the card.
-- **Topics** — with a Gemini key, words are grouped by theme and Learn introduces new words topic by topic.
+- **Sets** — Learn introduces new words 8 at a time, in the order you entered them; finishing a set offers "Start Set 2".
 - **Pronunciation** — real native-speaker recordings from Wiktionary/Wikimedia Commons when available (free, no key), otherwise the best-sounding voice on the device; optional Gemini cloud voice with the user's own key. Slow replay.
 - **Study modes** — Flashcards (3D flip, swipe), **Learn** (adaptive ladder), Write, Listen (dictation), Match (timed, best time saved), Test (generated exam with pass mark), and **Articles & plurals** (a game for der/die/das and plural forms).
 - **Daily review + streak** — a light ~10-minute session across all decks with words you already know, the most-missed first. The streak counts only days on which you finished it; "Keep reviewing" offers more.
@@ -39,9 +39,11 @@ Pictures and pronunciation are automatic and need no API keys. AI extras are opt
 | 4 | Written | Write the term from the definition + picture |
 | 5 | Mastered | Spaced-repetition reviews (Write 60%, Dictation 25%, MC 15%) |
 
-**Learn is a daily session.** It picks today's words (due reviews, words in progress, then up to 10 new words from the current topic), asks them in rounds of 7, and ends with "Done for today". One correct answer moves a word up a step (configurable 1–3), and each word climbs at most 2 steps per day (configurable 1–5), so a new word takes about 2 days to master and is then reviewed after 1 day, 6 days, and so on. A mistake moves a word down one step and brings it back 3–5 questions later; after 3 mistakes in a day it rests until tomorrow. Typical session: 5–15 minutes.
+**Learn is a daily session.** It picks today's words (due reviews, words in progress, then up to 10 new words from the current set), asks them in rounds of 7, and ends with your results — or "Set 1 complete!" with a big "Start Set 2" button. One correct answer moves a word up a step, and each word climbs at most 2 steps per day (fixed defaults; Settings only cover sound and looks), so a new word takes about 2 days to master and is then reviewed after 1 day, 6 days, and so on. A mistake moves a word down one step and brings it back 3–5 questions later; after 3 mistakes in a day it rests until tomorrow. Typical session: 5–15 minutes.
 
-**Topics.** New words come one topic at a time: AI topics with a Gemini key, otherwise sets of 8 words in deck order. The next topic starts when 3 of every 4 words in the current one can be written. Earlier topics keep coming back as reviews, so sessions become a mix of everything.
+**Sets.** New words come one set of 8 at a time, in deck order. The next set starts when 3 of every 4 words in the current one can be written. Earlier sets keep coming back as reviews, so sessions become a mix of everything.
+
+**Articles and plurals in Learn.** Nouns show their article in a gender colour (der blue, die red, das green) and their plural on the back of the card; writing a noun from its meaning needs the article ("das Buch"). Plurals are drilled in the separate Articles & plurals game, which only uses nouns already met in Learn.
 
 ## Screenshots
 
@@ -85,7 +87,7 @@ There is **no app-wide AI key**. Each user can add their own free key in **Setti
 2. Click **Create API key** and copy it. New keys start with `AQ.` (since May 2026); older `AIza…` keys also work.
 3. In the app: **Settings → AI features** → paste → **Save key**. The app checks it with Google and shows "Connected".
 
-With a key, that user gets: better definition suggestions (plus an example sentence), smart pictures (only for words where a picture helps, with a better search keyword), topic groups that Learn uses to introduce related words together, a cloud voice when their device has no voice for a language (or if they prefer it), and **✨ Generate deck** from a topic. Usage counts only against their own free quota.
+With a key, that user gets: better definition suggestions (plus an example sentence), better picture search for non-English meanings, articles and plurals for French, Spanish, Italian and Portuguese nouns, a cloud voice when their device has no voice for a language, and **✨ Generate deck** from a topic. Usage counts only against their own free quota.
 
 Keys are verified with Google before saving, stored **encrypted** (AES-256-GCM, key derived from `SESSION_SECRET`), used only server-side for that user's own requests, never sent back to the browser and never logged. Calls are rate-limited to 60/minute per user, and any Gemini failure falls back to the free path.
 

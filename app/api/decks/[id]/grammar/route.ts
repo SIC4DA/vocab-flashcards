@@ -8,7 +8,7 @@ import { cleanGrammar, lookupGermanNoun } from "@/lib/grammar-lookup";
 import { genderArticles } from "@/lib/languages";
 import { geminiRateLimit } from "@/lib/rate-limit";
 import { userGeminiKey } from "@/lib/user-gemini";
-import { organizeSchema } from "@/lib/validation";
+import { cardIdsSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const maxDuration = 25;
@@ -24,7 +24,7 @@ export const POST = route(async (req, ctx: RouteContext<"/api/decks/[id]/grammar
   const user = await requireUser(req);
   const { id } = await ctx.params;
   const deck = await getOwnedDeck(user.id, id);
-  const { cardIds } = await parseJson(req, organizeSchema);
+  const { cardIds } = await parseJson(req, cardIdsSchema);
   const articles = genderArticles(deck.termLang);
   if (articles.length === 0) return ok({ cards: [], remaining: 0 });
 

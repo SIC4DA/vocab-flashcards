@@ -22,6 +22,7 @@ import {
   nextRoundIds,
   planLearnSession,
   reviewQuestionType,
+  SET_SIZE,
   shuffle,
   topicSummary,
   type SessionItem,
@@ -95,11 +96,11 @@ export const GET = route(async (req) => {
     );
 
   if (mode === "learn") {
-    // "Keep going" after the daily session: each bonus level allows one more step per word and 5 more new words.
-    const bonus = Math.max(0, Math.min(3, Number(sp.get("bonus") ?? 0) || 0));
+    // "Keep going" / "Start the next set": each bonus level allows one more step per word and a set’s worth of new words.
+    const bonus = Math.max(0, Math.min(6, Number(sp.get("bonus") ?? 0) || 0));
     const today = localDay(now, tz);
     const stepsPerDay = settings.stepsPerDay + bonus;
-    newAllowed = newAllowedToday(settings, await newCardsIntroducedToday(user.id, localMidnight(now, tz))) + bonus * 5;
+    newAllowed = newAllowedToday(settings, await newCardsIntroducedToday(user.id, localMidnight(now, tz))) + bonus * SET_SIZE;
     const plan = planLearnSession(cards, { now, today, newAllowed, stepsPerDay });
     const items: SessionItem[] = plan.items;
     const topic = plan.topic?.label ?? null;

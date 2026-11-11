@@ -68,7 +68,7 @@ describe("Gemini key formats", () => {
 describe("topics in Learn", () => {
   const now = new Date("2026-03-01T10:00:00Z");
   const today = "2026-03-01";
-  const card = (i: number, group: string | null, progress: Partial<Progress> = {}): StudyCard => ({
+  const card = (i: number, progress: Partial<Progress> = {}): StudyCard => ({
     id: `c${i}`,
     deckId: "d",
     term: `t${i}`,
@@ -76,7 +76,6 @@ describe("topics in Learn", () => {
     example: "",
     imageUrl: null,
     imageAttribution: null,
-    group,
     termLang: "de-DE",
     definitionLang: "en-US",
     progress: { ...NEW_PROGRESS, ...progress },
@@ -84,14 +83,8 @@ describe("topics in Learn", () => {
   const newIds = (cards: StudyCard[], newAllowed = 10) =>
     planLearnSession(cards, { now, today, newAllowed, stepsPerDay: 2 }).items.filter((i) => i.kind === "new").map((i) => i.id);
 
-  it("uses AI topics in order of first appearance, new words only from the current topic", () => {
-    const cards = [card(1, "Food"), card(2, "Animals"), card(3, "Food"), card(4, "Animals"), card(5, "Food")];
-    expect(deckTopics(cards).map((t) => t.label)).toEqual(["Food", "Animals"]);
-    expect(newIds(cards)).toEqual(["c1", "c3", "c5"]);
-  });
-
-  it("without AI topics, splits the deck into sets of 8 in deck order", () => {
-    const cards = Array.from({ length: 20 }, (_, i) => card(i, null));
+  it("splits the deck into sets of 8 in deck order", () => {
+    const cards = Array.from({ length: 20 }, (_, i) => card(i));
     expect(deckTopics(cards).map((t) => [t.label, t.cards.length])).toEqual([
       ["Set 1", 8],
       ["Set 2", 8],
@@ -100,27 +93,28 @@ describe("topics in Learn", () => {
     expect(newIds(cards)).toEqual(["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7"]);
   });
 
-  it("starts the next topic once 3 of 4 words in the current one can be written", () => {
-    const food = [0, 1, 2, 3].map((i) => card(i, "Food", { stage: 4 }));
-    const animals = [4, 5].map((i) => card(i, "Animals"));
-    // all 4 written → finished
-    expect(currentTopic(deckTopics([...food, ...animals]))?.label).toBe("Animals");
-    // one hard word still at stage 2: 3/4 written → still finished, it keeps being practised
-    food[3] = card(3, "Food", { stage: 2 });
-    expect(currentTopic(deckTopics([...food, ...animals]))?.label).toBe("Animals");
-    // two words not written yet → Food continues, no Animals words yet
-    food[2] = card(2, "Food", { stage: 3 });
-    expect(currentTopic(deckTopics([...food, ...animals]))?.label).toBe("Food");
-    expect(newIds([...food, ...animals])).toEqual([]);
-    // a word of the topic not even seen yet → topic not finished
-    expect(topicFinished({ key: "x", label: "x", cards: [card(9, "x", { stage: 6 }), card(10, "x")] })).toBe(false);
+  it("starts the next set once 3 of 4 words in the current one can be written", () => {
+    const set1 = Array.from({ length: 8 }, (_, i) => card(i, { stage: 4 }));
+    const set2 = [8, 9].map((i) => card(i));
+    // all 8 written → finished
+    expect(currentTopic(deckTopics([...set1, ...set2]))?.label).toBe("Set 2");
+    // two hard words still at stage 2: 6/8 written → still finished, they keep being practised
+    set1[6] = card(6, { stage: 2 });
+    set1[7] = card(7, { stage: 2 });
+    expect(currentTopic(deckTopics([...set1, ...set2]))?.label).toBe("Set 2");
+    // a third word not written yet → Set 1 continues, no Set 2 words yet
+    set1[5] = card(5, { stage: 3 });
+    expect(currentTopic(deckTopics([...set1, ...set2]))?.label).toBe("Set 1");
+    expect(newIds([...set1, ...set2])).toEqual([]);
+    // a word of the set not even seen yet → set not finished
+    expect(topicFinished({ key: "x", label: "x", cards: [card(9, { stage: 6 }), card(10)] })).toBe(false);
   });
 
-  it("summarises topic progress for the deck page", () => {
-    const cards = [card(1, "Food", { stage: 6 }), card(2, "Food", { stage: 4 }), card(3, "Animals")];
+  it("summarises set progress for the deck page", () => {
+    const cards = [...Array.from({ length: 8 }, (_, i) => card(i, { stage: i === 0 ? 6 : 4 })), card(8)];
     expect(topicSummary(deckTopics(cards))).toEqual([
-      expect.objectContaining({ label: "Food", total: 2, mastered: 1, written: 2, new: 0, finished: true, current: false }),
-      expect.objectContaining({ label: "Animals", total: 1, new: 1, finished: false, current: true }),
+      expect.objectContaining({ label: "Set 1", total: 8, mastered: 1, written: 8, new: 0, finished: true, current: false }),
+      expect.objectContaining({ label: "Set 2", total: 1, new: 1, finished: false, current: true }),
     ]);
   });
 });

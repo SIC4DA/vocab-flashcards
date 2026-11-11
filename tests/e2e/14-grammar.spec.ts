@@ -22,6 +22,33 @@ test("articles & plurals: look them up, play a round with a tip and a retry, the
 
   // Nothing known yet: look the nouns up (German Wiktionary).
   await page.getByTestId("grammar-lookup").click();
+  // Found, but not met in Learn yet: the game waits for them.
+  await expect(page.getByTestId("grammar-not-seen")).toContainText("3 nouns");
+
+  // Flashcards show the article in its gender colour, and the plural on the back.
+  await page.goto(`/decks/${deckId}/study/flashcards`);
+  await expect(page.getByTestId("flashcard-term").first()).toHaveText("der Hund");
+  await expect(page.getByTestId("flashcard-term").first().locator("[data-gender=m]")).toHaveText("der");
+  await page.getByTestId("flashcard").first().click();
+  await expect(page.getByTestId("noun-forms").first()).toHaveText("der Hund · die Hunde");
+
+  // Writing a noun: the article is part of the word.
+  await page.goto(`/decks/${deckId}/study/write`);
+  const first = nounFor((await page.getByTestId("question").getAttribute("data-card-id"))!);
+  await page.getByTestId("answer-input").fill(first.term);
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("feedback")).toHaveAttribute("data-correct", "false");
+  await expect(page.getByTestId("feedback")).toContainText("the article is part of the word");
+  await expect(page.getByTestId("correct-answer")).toHaveText(`${first.article} ${first.term}`);
+  await expect(page.getByTestId("term-plural")).toContainText(`die ${first.plural}`);
+
+  // Meet them in Learn (first view), then play.
+  for (const c of cards) {
+    await page.request.post("/api/review", { data: { cardId: c.id, mode: "learn", questionType: "flashcard", correct: true } });
+  }
+  await page.goto(`/decks/${deckId}`);
+  await expect(page.getByTestId("mode-grammar")).toContainText("3 nouns ready");
+  await page.getByTestId("mode-grammar").click();
   const q = page.getByTestId("grammar-question");
   await expect(q).toBeVisible();
 

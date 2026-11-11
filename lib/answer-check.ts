@@ -9,7 +9,8 @@
 import { getLanguage } from "./languages";
 import { acceptedAnswers, collapseWhitespace, levenshtein, stripDiacritics } from "./text";
 
-export type Verdict = "correct" | "accent" | "typo" | "wrong";
+/** "article": the word was right but its article was missing or wrong (writing nouns of gendered languages). */
+export type Verdict = "correct" | "accent" | "typo" | "article" | "wrong";
 
 export type CheckOptions = {
   strictAccents?: boolean;
@@ -60,7 +61,7 @@ export function checkAnswer(input: string, expectedRaw: string, opts: CheckOptio
   if (!given) return { verdict: "wrong", correct: false, expected: alternatives[0] };
 
   let best: CheckResult | null = null;
-  const rank: Record<Verdict, number> = { correct: 3, accent: 2, typo: 1, wrong: 0 };
+  const rank: Record<Verdict, number> = { correct: 3, accent: 2, typo: 1, article: 0, wrong: 0 };
 
   for (const alt of alternatives) {
     const exp = normalizeAnswer(alt, opts);
@@ -110,4 +111,29 @@ export function diffSegments(input: string, expected: string): { text: string; o
     else segs.push({ text: ch, ok: marks[k] });
   });
   return segs;
+}
+
+/**
+ * Writing a noun of a gendered language: the article is part of the word ("das Buch").
+ * Right word with a missing or wrong article → verdict "article" (not correct).
+ */
+export function checkNounAnswer(
+  input: string,
+  forms: { article: string | null; noun: string; full: string },
+  opts: CheckOptions & { genderArticles: string[] },
+): CheckResult {
+  const res = checkAnswer(input, forms.full, opts);
+  if (res.correct || !forms.article) return res;
+  const given = input.trim().replace(/\s+/g, " ");
+  const lower = given.toLowerCase();
+  let bare = given;
+  for (const art of opts.genderArticles) {
+    if (art.endsWith("'") ? lower.startsWith(art) : lower.startsWith(`${art} `)) {
+      bare = given.slice(art.length).trim();
+      break;
+    }
+  }
+  const nounOnly = checkAnswer(bare, forms.noun, opts);
+  if (nounOnly.correct || nounOnly.verdict === "typo") return { verdict: "article", correct: false, expected: forms.full };
+  return res;
 }

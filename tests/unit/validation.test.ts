@@ -62,7 +62,7 @@ describe("settings", () => {
     expect(resolveSettings(undefined)).toEqual(DEFAULT_SETTINGS);
     const s = resolveSettings({ speechRate: 5, advanceAfter: 3, theme: "dark", bogus: 1 });
     expect(s.speechRate).toBe(0.9);
-    expect(s.advanceAfter).toBe(3);
+    expect(s.advanceAfter).toBe(1); // study pacing is fixed: stored values are ignored
     expect(s.theme).toBe("dark");
     expect("bogus" in s).toBe(false);
   });

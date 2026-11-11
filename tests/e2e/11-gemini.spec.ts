@@ -30,6 +30,9 @@ test("each user adds their own Gemini key in Settings; without it the AI UI is h
   // Generate deck works with the user's key
   await page.goto("/decks/new");
   await page.getByLabel("Title").fill("Kitchen (AI)");
+  await page.getByLabel(/Term language/).click();
+  await page.getByLabel(/Term language/).fill("Spanish");
+  await page.getByRole("option", { name: /Spanish/ }).click();
   await page.getByTestId("generate-toggle").click();
   await page.getByLabel("Topic").fill("kitchen items");
   await page.getByRole("spinbutton", { name: "Cards" }).fill("3");
@@ -73,9 +76,8 @@ test("the in-app guide explains when a word is learned", async ({ page }) => {
 
   // Personalised for a logged-in user, and linked from Settings
   await registerAPI(page, uid("Reader_"));
-  await page.request.patch("/api/account/settings", { data: { advanceAfter: 3 } });
   await page.goto("/settings");
   await page.getByRole("link", { name: /How the app works/ }).click();
   await expect(page).toHaveURL(/\/help$/);
-  await expect(page.getByText("at least 12 correct answers")).toBeVisible();
+  await expect(page.getByText("at least 4 correct answers")).toBeVisible();
 });

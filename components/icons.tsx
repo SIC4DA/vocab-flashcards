@@ -105,3 +105,11 @@ export const CrossIcon = (p: P) => (
     <path d="M7 7l10 10M17 7 7 17" />
   </Svg>
 );
+
+export const MoreIcon = (p: P) => (
+  <Svg {...p}>
+    <circle cx="5" cy="12" r="1.2" fill="currentColor" />
+    <circle cx="12" cy="12" r="1.2" fill="currentColor" />
+    <circle cx="19" cy="12" r="1.2" fill="currentColor" />
+  </Svg>
+);

@@ -30,7 +30,6 @@ type Row = {
   hasUploadedImage: boolean;
   imageSource: string | null;
   noImage: boolean;
-  groupLabel: string | null;
   /** Noun grammar ("" = none / not known yet). */
   article: string;
   plural: string;
@@ -51,7 +50,6 @@ const emptyRow = (): Row => ({
   hasUploadedImage: false,
   imageSource: null,
   noImage: false,
-  groupLabel: null,
   article: "",
   plural: "",
 });
@@ -69,16 +67,12 @@ function fromCard(c: CardDTO): Row {
     hasUploadedImage: c.hasUploadedImage,
     imageSource: c.imageSource,
     noImage: c.noImage,
-    groupLabel: c.groupLabel,
     article: c.article ?? "",
     plural: c.plural ?? "",
   };
 }
 
 const isBlank = (r: Row) => !r.term.trim() && !r.definition.trim() && !r.example.trim() && !r.preview;
-
-const chunk = <T,>(items: T[], size: number) =>
-  Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size));
 
 async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
   let i = 0;
@@ -98,7 +92,7 @@ export function DeckEditor({ deck, cards }: { deck?: DeckDTO; cards?: CardDTO[] 
   const [meta, setMeta] = useState({
     title: deck?.title ?? "",
     description: deck?.description ?? "",
-    termLang: deck?.termLang ?? "es-ES",
+    termLang: deck?.termLang ?? "de-DE",
     definitionLang: deck?.definitionLang ?? "en-US",
   });
   const [rows, setRows] = useState<Row[]>(() =>
@@ -340,29 +334,6 @@ export function DeckEditor({ deck, cards }: { deck?: DeckDTO; cards?: CardDTO[] 
       }
       const uploadedIds = new Set(uploads.map((u) => u.card.id));
       const noImageIds = new Set(saved.filter((c) => c.noImage).map((c) => c.id));
-
-      // With the user's Gemini key: decide which words need a picture + group them by topic.
-      if (gemini) {
-        const todo = saved.filter((c) => !c.groupLabel).map((c) => c.id);
-        const batches = chunk(todo, 60);
-        let organizeFailed = false;
-        for (let b = 0; b < batches.length; b++) {
-          setSaving(`Organising with AI… ${Math.min((b + 1) * 60, todo.length)}/${todo.length}`);
-          try {
-            const res = await api<{ cards: { id: string; noImage: boolean }[] }>(`/api/decks/${deckId}/organize`, {
-              body: { cardIds: batches[b] },
-            });
-            for (const c of res.cards) {
-              if (c.noImage) noImageIds.add(c.id);
-              else noImageIds.delete(c.id);
-            }
-          } catch {
-            organizeFailed = true;
-            break;
-          }
-        }
-        if (organizeFailed) toast.show("AI organising didn't finish — you can retry from the deck page.", { kind: "error" });
-      }
 
       // Articles & plurals: fill in what's missing (Wiktionary for German, the Gemini key for the rest).
       if (genderArticles(meta.termLang).length && saved.some((c) => !c.grammarChecked)) {

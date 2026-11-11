@@ -102,33 +102,6 @@ export async function geminiGenerateDeck(
   );
 }
 
-/**
- * One request for a batch of cards: does each word need a picture, a good image-search keyword,
- * and a topic group (reusing existing topic names).
- */
-export async function geminiOrganize(
-  key: string,
-  items: { term: string; definition: string }[],
-  termLang: string,
-  existingGroups: string[],
-): Promise<unknown> {
-  const list = items.map((c, i) => ({ i, term: c.term, meaning: c.definition }));
-  return generateJson<unknown>(
-    key,
-    `You organise vocabulary flashcards for a learner of ${languageName(termLang)}.\n` +
-      `For EACH card return an object {"i": number, "image": boolean, "keyword": string, "group": string}.\n` +
-      `- "image": true only if a photo clearly shows the meaning and helps remember it: concrete objects, food, animals, ` +
-      `plants, places, buildings, vehicles, clothing, body parts, colours, weather, people/jobs, and clearly visible ` +
-      `physical actions (swim, eat, run). false for abstract nouns, most verbs (e.g. spell, think, believe, decide, ` +
-      `need), adjectives that can't be photographed, adverbs, pronouns, prepositions, conjunctions, numbers and phrases.\n` +
-      `- "keyword": 1-3 English words to search a stock photo (empty string when image is false).\n` +
-      `- "group": a short English topic label of 1-3 words, by theme or situation (e.g. "Kitchen", "Food", "Travel", ` +
-      `"Feelings", "Everyday verbs"), aiming for 3-10 cards per topic. Do not group by grammar alone unless nothing else fits. ` +
-      (existingGroups.length ? `Reuse these existing topics when they fit: ${JSON.stringify(existingGroups.slice(0, 40))}.\n` : "\n") +
-      `Reply with a JSON array only, one object per card, same "i" values.\n\nCards: ${JSON.stringify(list)}`,
-  );
-}
-
 /** Returns raw 16-bit PCM (24 kHz mono) from Gemini TTS. */
 export async function geminiTts(key: string, text: string, lang: string): Promise<{ pcm: Buffer; sampleRate: number }> {
   const res = await call(key, geminiTtsModel(), {

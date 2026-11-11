@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiClientError } from "@/lib/client/api";
 import type { CardDTO, DeckDTO } from "@/lib/data";
 import { cardArticle, hasPlural, splitArticle } from "@/lib/grammar";
@@ -12,7 +12,8 @@ import { isDue } from "@/lib/srs";
 import { AudioButton } from "./audio";
 import { CardImage } from "./card-image";
 import { formatDate } from "./dashboard";
-import { useApp, useConfirm, useToast } from "./providers";
+import { MoreIcon } from "./icons";
+import { useConfirm, useToast } from "./providers";
 import { EmptyState } from "./ui";
 
 export const MODES = [
@@ -44,21 +45,19 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
   const router = useRouter();
   const toast = useToast();
   const confirm = useConfirm();
-  const { gemini } = useApp();
-  const [organizing, setOrganizing] = useState<string | null>(null);
   const [cards, setCards] = useState(initialCards);
   const [busy, setBusy] = useState(false);
   const termLang = getLanguage(deck.termLang);
   const defLang = getLanguage(deck.definitionLang);
 
   const buckets = useMemo(() => stageBuckets(cards), [cards]);
-  const hasTopics = cards.some((c) => c.groupLabel);
   const genders = genderArticles(deck.termLang);
-  const grammarCount = cards.filter((c) => cardArticle(c, deck.termLang) || hasPlural(c.plural)).length;
+  // Nouns ready for Articles & plurals: met in Learn, with an article or plural.
+  const grammarCount = cards.filter((c) => c.progress.stage >= 1 && (cardArticle(c, deck.termLang) || hasPlural(c.plural))).length;
   const topics = useMemo(
     () =>
       topicSummary(
-        deckTopics(cards.map((c) => ({ id: c.id, group: c.groupLabel, progress: c.progress }) as unknown as StudyCard)),
+        deckTopics(cards.map((c) => ({ id: c.id, progress: c.progress }) as unknown as StudyCard)),
       ),
     [cards],
   );
@@ -102,46 +101,27 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
     }
   }
 
-  /** AI pass over every card: picture yes/no, image keyword and topic; then find missing pictures. */
-  async function organize() {
-    setOrganizing("Organising with AI…");
+  async function resetDeck() {
+    if (!(await confirm({ title: "Reset progress?", message: "Every word in this deck goes back to New. Your cards are kept.", confirmLabel: "Reset progress", danger: true }))) return;
     try {
-      const ids = cards.map((c) => c.id);
-      for (let i = 0; i < ids.length; i += 60) {
-        setOrganizing(`Organising with AI… ${Math.min(i + 60, ids.length)}/${ids.length}`);
-        await api(`/api/decks/${deck.id}/organize`, { body: { cardIds: ids.slice(i, i + 60), force: true } });
-      }
-      const fresh = await api<{ cards: CardDTO[] }>(`/api/decks/${deck.id}`);
-      const missing = fresh.cards.filter((c) => !c.displayImageUrl && !c.noImage);
-      let done = 0;
-      for (const c of missing) {
-        setOrganizing(`Finding images… ${++done}/${missing.length}`);
-        await api(`/api/cards/${c.id}/auto-image`, { method: "POST" }).catch(() => null);
-      }
-      const final = await api<{ cards: CardDTO[] }>(`/api/decks/${deck.id}`);
-      setCards(final.cards);
-      toast.show("Deck organised: topics set, pictures only where they help", { kind: "success" });
+      await api(`/api/decks/${deck.id}/reset-progress`, { method: "POST" });
+      setCards((cs) => cs.map((c) => ({ ...c, progress: { ...NEW_PROGRESS } })));
+      toast.show("Deck progress reset");
     } catch (err) {
-      toast.show(err instanceof ApiClientError ? err.message : "Organising failed", { kind: "error" });
-    } finally {
-      setOrganizing(null);
+      toast.show(err instanceof ApiClientError ? err.message : "Couldn't reset progress", { kind: "error" });
     }
   }
 
-  async function resetDeck() {
-    if (!(await confirm({ title: "Reset progress for this deck?", message: "All cards go back to New. Your review history is kept.", confirmLabel: "Reset progress", danger: true }))) return;
-    await api(`/api/decks/${deck.id}/reset-progress`, { method: "POST" });
-    setCards((cs) => cs.map((c) => ({ ...c, progress: { ...NEW_PROGRESS } })));
-    toast.show("Progress reset");
-  }
-
   async function resetCard(id: string) {
-    await api(`/api/cards/${id}/reset-progress`, { method: "POST" });
-    setCards((cs) => cs.map((c) => (c.id === id ? { ...c, progress: { ...NEW_PROGRESS } } : c)));
-    toast.show("Card progress reset");
+    try {
+      await api(`/api/cards/${id}/reset-progress`, { method: "POST" });
+      setCards((cs) => cs.map((c) => (c.id === id ? { ...c, progress: { ...NEW_PROGRESS } } : c)));
+      toast.show("Progress reset");
+    } catch (err) {
+      toast.show(err instanceof ApiClientError ? err.message : "Couldn't reset progress", { kind: "error" });
+    }
   }
 
-  // Articles & plurals only exists for languages whose nouns have a gender.
   const otherModes = MODES.filter((m) => m.mode !== "learn" && (m.mode !== "grammar" || genders.length > 0));
   const doneToday = cards.length - buckets.new;
 
@@ -165,31 +145,18 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
             </p>
             {deck.description && <p className="mt-2 max-w-2xl">{deck.description}</p>}
           </div>
-          <div className="-ml-2 flex flex-wrap gap-0.5 sm:ml-0 sm:gap-2">
-            <Link href={`/decks/${deck.id}/edit`} className="btn-secondary px-3 text-sm sm:px-4 sm:text-[0.95rem]">
+          <div className="flex items-center gap-2">
+            <Link href={`/decks/${deck.id}/edit`} className="btn-secondary px-4" data-testid="edit-deck">
               Edit
             </Link>
-            {gemini && cards.length > 0 && (
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={organize}
-                disabled={Boolean(organizing)}
-                title="Group words by topic and keep pictures only for words where a picture helps"
-                data-testid="organize-ai"
-              >
-                {organizing ?? "Organize with AI"}
-              </button>
-            )}
-            <button type="button" className="btn-ghost px-2.5 text-sm sm:px-4 sm:text-[0.95rem]" onClick={duplicate} disabled={busy}>
-              Duplicate
-            </button>
-            <a href={`/api/decks/${deck.id}/export.csv`} className="btn-ghost px-2.5 text-sm sm:px-4 sm:text-[0.95rem]" download>
-              Export CSV
-            </a>
-            <button type="button" className="btn-ghost px-2.5 text-sm text-danger sm:px-4 sm:text-[0.95rem]" onClick={remove} disabled={busy}>
-              Delete
-            </button>
+            <MoreMenu
+              items={[
+                { label: "Duplicate", onSelect: duplicate, disabled: busy },
+                { label: "Export CSV", href: `/api/decks/${deck.id}/export.csv` },
+                { label: "Reset progress", onSelect: resetDeck, disabled: cards.length === 0 },
+                { label: "Delete deck", onSelect: remove, disabled: busy, danger: true },
+              ]}
+            />
           </div>
         </div>
       </section>
@@ -237,7 +204,7 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
                     <span className="font-display text-lg font-semibold group-hover:text-accent">{m.label}</span>
                     <span className="text-right text-sm text-muted">
                       {m.mode === "grammar"
-                        ? `${genders.join(", ")} and plurals${grammarCount > 0 ? ` · ${grammarCount} nouns` : ""}`
+                        ? `${genders.join(", ")} and plurals${grammarCount > 0 ? ` · ${grammarCount} nouns ready` : ""}`
                         : m.desc}
                     </span>
                   </Link>
@@ -249,10 +216,10 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
           <section aria-labelledby="topics-h" data-testid="topics-panel">
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line pb-2">
               <h2 id="topics-h" className="text-xl font-semibold">
-                {hasTopics ? "Topics" : "Sets"}
+                Sets
               </h2>
               <p className="text-sm text-muted">
-                One {hasTopics ? "topic" : "set"} at a time; the next starts when 3 of every 4 words can be written.{" "}
+                One set of 8 words at a time; the next starts when 3 of every 4 words can be written.{" "}
                 <Link href="/help#learned" className="font-medium text-accent hover:underline">
                   How it works
                 </Link>
@@ -344,11 +311,8 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
           </section>
 
           <section className="panel overflow-hidden" aria-label="Cards">
-            <div className="flex items-center justify-between px-5 py-4">
+            <div className="px-5 py-4">
               <h2 className="text-xl font-semibold">Words</h2>
-              <button type="button" className="btn-ghost text-sm text-danger" onClick={resetDeck}>
-                Reset deck progress
-              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[40rem] text-sm">
@@ -359,9 +323,6 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
                     </th>
                     <th className="px-4 py-2 font-medium" scope="col">Term</th>
                     <th className="px-4 py-2 font-medium" scope="col">Definition</th>
-                    {hasTopics && (
-                      <th className="px-4 py-2 font-medium" scope="col">Topic</th>
-                    )}
                     <th className="px-4 py-2 font-medium" scope="col">Stage</th>
                     <th className="px-4 py-2 font-medium" scope="col">Next due</th>
                     <th className="px-4 py-2 font-medium" scope="col">Right / wrong</th>
@@ -404,11 +365,6 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
                         <td className="px-4 py-2" dir={langDir(deck.definitionLang)}>
                           {c.definition}
                         </td>
-                        {hasTopics && (
-                          <td className="px-4 py-2 text-muted" data-testid="card-topic">
-                            {c.groupLabel ?? "—"}
-                          </td>
-                        )}
                         <td className="px-4 py-2" data-testid="card-stage">
                           {STAGE_NAMES[c.progress.stage]}
                         </td>
@@ -436,6 +392,89 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
             </div>
           </section>
         </>
+      )}
+    </div>
+  );
+}
+
+type MenuItem = { label: string; onSelect?: () => void; href?: string; disabled?: boolean; danger?: boolean };
+
+/** "⋯" menu for the less common deck actions (keeps the deck page about studying). */
+function MoreMenu({ items }: { items: MenuItem[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+        ref.current?.querySelector<HTMLButtonElement>("button[aria-haspopup]")?.focus();
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [open]);
+  useEffect(() => {
+    if (open) ref.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+  }, [open]);
+
+  const itemClass = (danger?: boolean) =>
+    `block w-full px-4 py-2.5 text-left text-[0.95rem] hover:bg-surface-2 focus:bg-surface-2 focus:outline-none disabled:opacity-50 ${danger ? "text-danger" : ""}`;
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        className="btn-icon"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="More deck actions"
+        onClick={() => setOpen((o) => !o)}
+        data-testid="deck-menu"
+      >
+        <MoreIcon />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 z-20 mt-1 min-w-44 overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-[var(--shadow-lift)]"
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+            e.preventDefault();
+            const els = Array.from(e.currentTarget.querySelectorAll<HTMLElement>("[role=menuitem]"));
+            const i = els.indexOf(document.activeElement as HTMLElement);
+            els[(i + (e.key === "ArrowDown" ? 1 : els.length - 1)) % els.length]?.focus();
+          }}
+        >
+          {items.map((it) =>
+            it.href ? (
+              <a key={it.label} role="menuitem" href={it.href} download className={itemClass(it.danger)} onClick={() => setOpen(false)}>
+                {it.label}
+              </a>
+            ) : (
+              <button
+                key={it.label}
+                type="button"
+                role="menuitem"
+                className={itemClass(it.danger)}
+                disabled={it.disabled}
+                onClick={() => {
+                  setOpen(false);
+                  it.onSelect?.();
+                }}
+              >
+                {it.label}
+              </button>
+            ),
+          )}
+        </div>
       )}
     </div>
   );

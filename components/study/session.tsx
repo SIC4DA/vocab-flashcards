@@ -525,12 +525,18 @@ function Celebration({
             </span>
           </div>
         )}
-        <h1 className="mt-4 text-[2rem] font-semibold">
-          {daily ? (empty ? "All done for today" : "Done for today!") : "Session complete!"}
+        <h1 className="mt-4 text-[2rem] font-semibold" data-testid="session-title">
+          {!daily
+            ? "Session complete!"
+            : finishedTopic
+              ? `${finishedTopic} complete!`
+              : empty
+                ? "Nothing waiting right now"
+                : "Nice work!"}
         </h1>
         <p className="mt-2 text-muted">
           {empty
-            ? "Every word here has had its practice for today, or is waiting for its next review."
+            ? "Every word you’re learning has had its practice for now. Keep going to practise more and meet new words."
             : `${totals.correct} of ${total} answers correct${total ? ` (${Math.round((totals.correct / total) * 100)}%)` : ""}.`}
         </p>
         {daily && !empty && (
@@ -542,26 +548,23 @@ function Celebration({
         )}
         {finishedTopic && (
           <p className="mt-4 border-l-4 border-success bg-success-soft px-4 py-2 text-left font-semibold text-success" data-testid="topic-finished">
-            Topic “{finishedTopic}” complete!{topicNow ? ` Next topic: “${topicNow}”.` : ""}
+            {topicNow
+              ? `You finished ${finishedTopic}. ${topicNow} is next.`
+              : `You finished ${finishedTopic}, the last set. Every word in this deck is under way.`}
           </p>
         )}
-        {daily && (
-          <p className="mt-4 text-sm text-muted">
-            Come back tomorrow: practising a little every day makes words stick much better than repeating them many
-            times in one go.
-          </p>
-        )}
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link href={exitHref} className="btn-primary">
-            Back to {title.length > 24 ? "deck" : title}
-          </Link>
-          {daily && onKeepGoing && mode === "learn" && (
-            <button type="button" className="btn-secondary" onClick={onKeepGoing} data-testid="keep-going">
-              {finishedTopic && topicNow ? `Start “${topicNow}” now` : "Keep going anyway"}
+        <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:justify-center">
+          {daily && onKeepGoing && finishedTopic && topicNow ? (
+            <button type="button" className="btn-primary px-8 text-lg" onClick={onKeepGoing} autoFocus data-testid="start-next-set">
+              Start {topicNow}
             </button>
-          )}
-          <Link href="/" className="btn-ghost">
-            Dashboard
+          ) : daily && onKeepGoing ? (
+            <button type="button" className="btn-primary px-8 text-lg" onClick={onKeepGoing} autoFocus data-testid="keep-going">
+              Keep going
+            </button>
+          ) : null}
+          <Link href={exitHref} className={daily && onKeepGoing ? "btn-secondary" : "btn-primary"}>
+            Back to {title.length > 24 ? "deck" : title}
           </Link>
         </div>
       </div>

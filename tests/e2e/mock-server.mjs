@@ -97,22 +97,6 @@ const server = http.createServer((req, res) => {
         const pcm = Buffer.alloc(4800).toString("base64");
         return send(res, 200, { candidates: [{ content: { parts: [{ inlineData: { mimeType: "audio/L16;codec=pcm;rate=24000", data: pcm } }] } }] });
       }
-      if (body.includes("You organise vocabulary flashcards")) {
-        const text = JSON.parse(body).contents[0].parts[0].text;
-        const cards = JSON.parse(text.slice(text.indexOf("Cards: ") + 7));
-        return send(
-          res,
-          200,
-          gemini(
-            JSON.stringify(
-              cards.map((c) => {
-                const verb = /^to /.test(c.meaning);
-                return { i: c.i, image: !verb, keyword: verb ? "" : c.meaning, group: verb ? "Everyday verbs" : "Home" };
-              }),
-            ),
-          ),
-        );
-      }
       if (body.includes("You check the grammar of")) {
         const text = JSON.parse(body).contents[0].parts[0].text;
         const items = JSON.parse(text.slice(text.indexOf("Items: ") + 7));

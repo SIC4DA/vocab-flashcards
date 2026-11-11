@@ -70,8 +70,6 @@ export type StudyCard = {
   example: string;
   imageUrl: string | null;
   imageAttribution: string | null;
-  /** Topic group suggested by AI (null without a Gemini key). */
-  group?: string | null;
   /** Noun grammar (Articles & plurals game). */
   article?: string | null;
   plural?: string | null;
@@ -380,7 +378,7 @@ export function isCardDue(c: StudyCard, now: Date = new Date()) {
 /* Topics (groups)                                                    */
 /* ------------------------------------------------------------------ */
 
-/** Without AI topics, the deck is split into sets of this many words, in deck order. */
+/** The deck is split into sets of this many words, in deck order. */
 export const SET_SIZE = 8;
 /** A word counts towards finishing its topic once it can be written (stage ≥ Written). */
 export const TOPIC_DONE_STAGE = 4;
@@ -392,17 +390,8 @@ export const TOPIC_DONE_SHARE = 0.75;
 
 export type Topic = { key: string; label: string; cards: StudyCard[] };
 
-/** Topics in deck order: AI topic labels when present, otherwise "Set 1", "Set 2", … of 8 words. */
+/** Sets in deck order: "Set 1", "Set 2", … of 8 words. */
 export function deckTopics(cards: StudyCard[]): Topic[] {
-  if (cards.some((c) => c.group)) {
-    const map = new Map<string, Topic>();
-    for (const c of cards) {
-      const label = c.group ?? "Other";
-      if (!map.has(label)) map.set(label, { key: `g:${label}`, label, cards: [] });
-      map.get(label)!.cards.push(c);
-    }
-    return [...map.values()];
-  }
   const topics: Topic[] = [];
   for (let i = 0; i < cards.length; i += SET_SIZE) {
     topics.push({ key: `set:${i / SET_SIZE}`, label: `Set ${i / SET_SIZE + 1}`, cards: cards.slice(i, i + SET_SIZE) });

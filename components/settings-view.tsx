@@ -41,48 +41,6 @@ function Toggle({
   );
 }
 
-function NumberField({
-  id,
-  label,
-  hint,
-  value,
-  min,
-  max,
-  step = 1,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  hint?: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <label htmlFor={id}>
-        <span className="font-semibold">{label}</span>
-        {hint && <span className="block text-sm text-muted">{hint}</span>}
-      </label>
-      <input
-        id={id}
-        type="number"
-        className="input w-24 text-right"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          if (Number.isFinite(v)) onChange(Math.max(min, Math.min(max, v)));
-        }}
-      />
-    </div>
-  );
-}
-
 function GeminiKeySection() {
   const app = useApp();
   // Shown immediately after saving/removing; the refreshed server data takes over afterwards.
@@ -194,7 +152,7 @@ function GeminiKeySection() {
 }
 
 export function SettingsView() {
-  const { settings, updateSettings, gemini } = useApp();
+  const { settings, updateSettings } = useApp();
   const toast = useToast();
   const confirm = useConfirm();
   const router = useRouter();
@@ -275,52 +233,7 @@ export function SettingsView() {
             className="w-40 accent-[var(--accent)]"
           />
         </div>
-        {gemini && (
-          <Toggle
-            id="s-cloud"
-            label="Prefer cloud voice"
-            hint="For words without a recording, use Gemini's natural voice (your key) instead of your device's voice. Gemini's free voice quota is small, so clips are cached and the device voice takes over when it runs out."
-            checked={settings.preferCloudVoice}
-            onChange={(v) => save({ preferCloudVoice: v })}
-          />
-        )}
-        <Toggle
-          id="s-recordings"
-          label="Use native-speaker recordings"
-          hint="Real recordings from Wiktionary when one exists for the word (best quality, free). Otherwise a voice is used."
-          checked={settings.useRecordings}
-          onChange={(v) => save({ useRecordings: v })}
-        />
         <Toggle id="s-sounds" label="Sound effects" hint="Short tones for right and wrong answers" checked={settings.soundEffects} onChange={(v) => save({ soundEffects: v })} />
-      </section>
-
-      <section className="panel divide-y divide-line px-5" aria-labelledby="study-h">
-        <h2 id="study-h" className="py-4 text-xl font-semibold">
-          Studying
-        </h2>
-        <Toggle id="s-strict" label="Strict accents" hint="Answers with wrong accents count as incorrect" checked={settings.strictAccents} onChange={(v) => save({ strictAccents: v })} />
-        <Toggle id="s-articles" label="Ignore articles" hint="“la casa” = “casa”" checked={settings.ignoreArticles} onChange={(v) => save({ ignoreArticles: v })} />
-        <NumberField
-          id="s-advance"
-          label="Correct answers to move up a step"
-          hint="1 is recommended; daily repetition does the rest"
-          value={settings.advanceAfter}
-          min={1}
-          max={3}
-          onChange={(v) => save({ advanceAfter: v })}
-        />
-        <NumberField
-          id="s-steps"
-          label="Steps per word per day"
-          hint="How far one word can climb in a day's Learn session (2 recommended)"
-          value={settings.stepsPerDay}
-          min={1}
-          max={5}
-          onChange={(v) => save({ stepsPerDay: v })}
-        />
-        <NumberField id="s-new" label="New words per day" value={settings.newPerDay} min={1} max={100} onChange={(v) => save({ newPerDay: v })} />
-        <NumberField id="s-round" label="Learn round size" value={settings.roundSize} min={5} max={15} onChange={(v) => save({ roundSize: v })} />
-        <NumberField id="s-pass" label="Test pass mark (%)" value={settings.passMark} min={50} max={100} onChange={(v) => save({ passMark: v })} />
       </section>
 
       <section className="panel px-5 py-4" aria-labelledby="theme-h">

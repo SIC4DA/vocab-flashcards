@@ -80,6 +80,12 @@ Speaking practice was removed at the owner's request (see DECISIONS.md #68–71)
 - Lighthouse (mobile, production build) after the redesign: landing 100 / 100 / 100; dashboard 94 / 100 / 100; deck 94 / 100 / 100; flashcards 93 / 100 / 100; Learn 93 / 100 / 96. The one Learn issue is a console 404 for the mock recording URL used in this test setup, which doesn't exist on the real Wikimedia server.
 - Screenshots of every page at 390 px and 1280 px, in light and dark mode, were reviewed and refreshed in `docs/screenshots/`.
 
+### Update: simpler deck page and settings, sets only, articles inside Learn
+
+- Unit tests: every grammar tip against words that fit and look-alikes that must not get it (German, Spanish, French, Italian, Portuguese; plural tips by gender); noun forms (stored article added, plural with its article, gender colours); writing a noun needs its article (missing or wrong article → "article", typos still "typo"); sets of 8 replace AI topics; stored values of removed settings are ignored.
+- Integration: the settings API accepts only sound/look settings and rejects the fixed ones.
+- E2E: Learn ends with "Nice work!" and never "done for today"; the full ladder is reached through "Keep going" with fixed defaults; the deck page has no Organize button and its ⋯ menu holds Duplicate / Export CSV / Reset progress / Delete deck; Articles & plurals waits until nouns are met in Learn, flashcards show "der" in the masculine colour and "der Hund · die Hunde" on the back, and Write mode marks "Hund" as missing its article.
+
 ### Update: daily review, Articles & plurals, sentences removed
 
 - Full chain passes: lint, typecheck, 155 unit/integration tests, 44 E2E tests (desktop + mobile), build.

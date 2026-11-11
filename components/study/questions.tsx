@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { checkAnswer, diffSegments, type Verdict } from "@/lib/answer-check";
+import { checkAnswer, checkNounAnswer, diffSegments, type Verdict } from "@/lib/answer-check";
+import { articleGender, nounForms } from "@/lib/grammar";
 import { isTypingTarget } from "@/lib/client/keys";
-import { langDir } from "@/lib/languages";
+import { genderArticles, langDir } from "@/lib/languages";
 import type { Question, StudyCard } from "@/lib/learn";
 import { gradeFor, type Grade } from "@/lib/srs";
 import { AudioButton, useSpeak } from "../audio";
@@ -17,7 +18,40 @@ export type Outcome = {
   grade: Grade;
   answerGiven: string;
   verdict?: Verdict;
+  /** What the answer was checked against, when it isn't just the term ("das Buch" for "Buch"). */
+  expected?: string;
 };
+
+const GENDER_CLASS = { m: "text-accent", f: "text-margin", n: "text-success" } as const;
+
+/**
+ * The word as a headword: its article coloured by gender (der blue, die red, das green), the article added
+ * when only the noun was typed, and optionally the plural underneath ("die Bücher").
+ */
+export function TermHeadword({ card, withPlural = false }: { card: StudyCard; withPlural?: boolean }) {
+  const f = nounForms(card, card.termLang);
+  const g = articleGender(f.article, card.termLang);
+  return (
+    <>
+      {f.article ? (
+        <>
+          <span className={g ? GENDER_CLASS[g] : undefined} data-gender={g ?? undefined}>
+            {f.article}
+          </span>
+          {f.article.endsWith("'") ? "" : " "}
+          {f.noun}
+        </>
+      ) : (
+        card.term
+      )}
+      {withPlural && f.pluralFull && (
+        <span className="mt-1 block font-sans text-base font-normal text-muted" data-testid="term-plural">
+          plural: {f.pluralFull}
+        </span>
+      )}
+    </>
+  );
+}
 
 export type QuestionProps = {
   question: Question;
@@ -87,7 +121,7 @@ function Prompt({ card, show }: { card: StudyCard; show: "term" | "definition" |
         <p className="text-sm text-muted">Term</p>
         <div className="flex items-center gap-2">
           <p className="headword text-[2.4rem] leading-tight sm:text-[2.8rem]" dir={langDir(card.termLang)} lang={card.termLang} data-testid="prompt-term">
-            {card.term}
+            <TermHeadword card={card} />
           </p>
           <AudioButton text={card.term} lang={card.termLang} />
         </div>
@@ -198,13 +232,16 @@ export function WriteQuestion({ question, card, answered, onAnswer }: QuestionPr
       inputRef.current?.focus();
       return;
     }
-    const res = checkAnswer(value, card.term, {
-      strictAccents: settings.strictAccents,
-      ignoreArticles: settings.ignoreArticles,
-      lang: card.termLang,
-    });
-    const grade: Grade = res.verdict === "correct" ? gradeFor("correct", elapsed()) : res.correct ? 3 : 1;
-    onAnswer({ correct: res.correct, grade, answerGiven: value, verdict: res.verdict });
+    const opts = { strictAccents: settings.strictAccents, ignoreArticles: settings.ignoreArticles, lang: card.termLang };
+    // Writing from the meaning: a noun's article is part of the word (dictation checks what was heard).
+    const arts = genderArticles(card.termLang);
+    const forms = nounForms(card, card.termLang);
+    const res =
+      !listen && arts.length && forms.article && !settings.ignoreArticles
+        ? checkNounAnswer(value, forms, { ...opts, genderArticles: arts })
+        : checkAnswer(value, card.term, opts);
+    const grade: Grade = res.verdict === "correct" ? gradeFor("correct", elapsed()) : res.correct ? 3 : res.verdict === "article" ? 2 : 1;
+    onAnswer({ correct: res.correct, grade, answerGiven: value, verdict: res.verdict, expected: res.expected });
   };
 
   return (
@@ -293,7 +330,7 @@ export function FlipCard({
   const termFace = (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
       <p className="headword text-[2.6rem] leading-tight sm:text-[3.6rem]" dir={langDir(card.termLang)} lang={card.termLang} data-testid="flashcard-term">
-        {card.term}
+        <TermHeadword card={card} />
       </p>
       <AudioButton text={card.term} lang={card.termLang} size="lg" />
     </div>
@@ -315,6 +352,7 @@ export function FlipCard({
         </p>
         <AudioButton text={card.definition} lang={card.definitionLang} />
       </div>
+      <NounFormsLine card={card} />
       {card.example && <ExampleToggle card={card} />}
     </div>
   );
@@ -421,7 +459,9 @@ export function Feedback({
         : "Correct!"
     : v === "typo"
       ? "Almost right"
-      : v === "accent"
+      : v === "article"
+        ? "Almost — the article is part of the word"
+        : v === "accent"
         ? "Almost — watch the accents"
         : "Not quite";
   return (
@@ -433,21 +473,27 @@ export function Feedback({
       <p className={`flex items-center gap-2 font-display text-xl font-semibold ${outcome.correct ? "text-success" : "text-danger"}`}>
         {outcome.correct ? <CheckIcon size={22} strokeWidth={2.4} /> : <CrossIcon size={22} strokeWidth={2.4} />} {title}
       </p>
+      {outcome.correct && v !== "accent" && v !== "typo" && nounForms(card, card.termLang).article && (
+        <p className="mt-1 headword text-lg" dir={langDir(card.termLang)} lang={card.termLang} data-testid="feedback-forms">
+          <TermHeadword card={card} withPlural />
+        </p>
+      )}
       {(!outcome.correct || v === "accent" || v === "typo") && (
         <div className="mt-2">
           <p className="text-sm text-muted">Correct answer</p>
           <p className="headword flex items-center gap-2 text-[1.7rem]" dir={langDir(card.termLang)} lang={card.termLang}>
             <span data-testid="correct-answer">
               {v === "typo" || v === "accent"
-                ? diffSegments(outcome.answerGiven, card.term).map((s, i) => (
+                ? diffSegments(outcome.answerGiven, outcome.expected ?? card.term).map((s, i) => (
                     <span key={i} className={s.ok ? "" : "text-danger underline decoration-2 underline-offset-4"}>
                       {s.text}
                     </span>
                   ))
-                : card.term}
+                : <TermHeadword card={card} />}
             </span>
             <AudioButton text={card.term} lang={card.termLang} size="sm" />
           </p>
+          <PluralLine card={card} />
           <p className="text-sm text-muted">{card.definition}</p>
           <div className="mt-1">
             <ExampleToggle card={card} />
@@ -470,5 +516,29 @@ export function Feedback({
         </button>
       </div>
     </div>
+  );
+}
+
+/** "plural: die Bücher" under the correct answer (nouns with a known plural). */
+function PluralLine({ card }: { card: StudyCard }) {
+  const f = nounForms(card, card.termLang);
+  if (!f.pluralFull) return null;
+  return (
+    <p className="text-sm text-muted" lang={card.termLang} data-testid="term-plural">
+      plural: {f.pluralFull}
+    </p>
+  );
+}
+
+/** On the back of a card: "das Buch · die Bücher" for nouns, so the article and plural are seen with every word. */
+function NounFormsLine({ card }: { card: StudyCard }) {
+  const f = nounForms(card, card.termLang);
+  // Only when it adds something: the plural, or an article the term itself doesn't show.
+  if (!f.pluralFull && !(f.article && f.full !== card.term.trim())) return null;
+  return (
+    <p className="font-display text-lg" dir={langDir(card.termLang)} lang={card.termLang} data-testid="noun-forms">
+      <TermHeadword card={card} />
+      {f.pluralFull && <span className="text-muted"> · {f.pluralFull}</span>}
+    </p>
   );
 }

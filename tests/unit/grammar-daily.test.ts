@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { applyDailyAnswer, lastDays, missScore, planDailyReview } from "@/lib/daily";
+import { checkNounAnswer } from "@/lib/answer-check";
 import {
+  articleGender,
   articleTip,
   buildGrammarRound,
   checkPlural,
   fullForms,
+  nounForms,
   pluralOptions,
   pluralTip,
   splitArticle,
@@ -40,13 +43,66 @@ describe("articles", () => {
     expect(splitTermPlural("the dog, dogs", "en-US")).toEqual({ term: "the dog, dogs", plural: null });
   });
 
-  it("gives a tip for common endings", () => {
-    expect(articleTip("Zeitung", "de-DE")).toContain("die");
-    expect(articleTip("Mädchen", "de-DE")).toContain("das");
-    expect(articleTip("canción", "es-ES")).toContain("la");
-    expect(pluralTip("Zeitung", "de-DE")).toContain("-en");
-    expect(pluralTip("lápiz", "es-ES")).toContain("-ces");
+  // Every tip must be true for the word it's shown with: rules are checked on words that fit
+  // and on common look-alikes that must NOT get that tip.
+  it("gives a correct article tip, and none for look-alike words that break the rule", () => {
+    const de = (w: string) => articleTip(w, "de-DE") ?? "";
+    expect(de("Zeitung")).toMatch(/are die/);
+    expect(de("Freiheit")).toMatch(/are die/);
+    expect(de("Bäckerei")).toMatch(/are die/);
+    expect(de("Konferenz")).toMatch(/are die/);
+    expect(de("Mädchen")).toMatch(/always das/);
+    expect(de("Fräulein")).toMatch(/always das/);
+    expect(de("Kuchen")).not.toMatch(/always das/); // der Kuchen
+    expect(de("Knochen")).not.toMatch(/always das/);
+    expect(de("Ei")).not.toMatch(/die/); // das Ei
+    expect(de("Spion")).not.toMatch(/are die/); // der Spion
+    expect(de("Tanz")).not.toMatch(/are die/); // der Tanz
+    expect(de("Museum")).toMatch(/das/);
+    expect(de("Baum")).not.toMatch(/Latin/); // der Baum
+    expect(de("Irrtum")).not.toMatch(/Latin/); // der Irrtum
+    expect(de("Motor")).toMatch(/der/);
+    expect(de("Tor")).toBe(""); // das Tor
+    expect(de("Frühling")).toMatch(/are der/);
+    expect(de("Polizist")).toMatch(/der/);
+    expect(de("Frist")).toBe(""); // die Frist
+    expect(de("Gemüse")).toMatch(/Ge-/);
+    expect(de("Lampe")).toMatch(/die/);
+    expect(articleTip("canción", "es-ES")).toMatch(/are la/);
+    expect(articleTip("cama", "es-ES")).toMatch(/la cama/); // -ma is split, the tip says so
+    expect(articleTip("mano", "es-ES")).toMatch(/la mano/);
+    expect(articleTip("côté", "fr-FR")).toMatch(/le côté/);
+    expect(articleTip("arbre", "fr-FR")).toMatch(/l’/);
+    expect(articleTip("héros", "fr-FR") ?? "").not.toMatch(/l’/); // le héros: aspirated h
+    expect(articleTip("stazione", "it-IT")).toMatch(/feminine/);
+    expect(articleTip("studente", "it-IT")).toMatch(/lo/);
     expect(articleTip("Hund", "en-US")).toBeNull();
+  });
+
+  it("gives a plural tip that fits the noun's gender", () => {
+    const de = (w: string, a: string) => pluralTip(w, "de-DE", a) ?? "";
+    expect(de("Zeitung", "die")).toMatch(/add -en/);
+    expect(de("Lehrerin", "die")).toMatch(/-nen/);
+    expect(de("Termin", "der")).not.toMatch(/-nen/); // der Termin → die Termine
+    expect(de("Mädchen", "das")).toMatch(/don't change/);
+    expect(de("Kuchen", "der")).toMatch(/stay the same/); // der Kuchen → die Kuchen
+    expect(de("Lehrer", "der")).toMatch(/stay the same/);
+    expect(de("Schwester", "die")).toMatch(/add -n/);
+    expect(de("Lampe", "die")).toMatch(/add -n/);
+    expect(de("Auto", "das")).toMatch(/add -s/);
+    expect(de("Frau", "die")).not.toMatch(/add -s/); // die Frauen
+    expect(de("Ei", "das")).not.toMatch(/add -s/); // die Eier
+    expect(de("Buch", "das")).toMatch(/-er with an umlaut/);
+    expect(de("Hund", "der")).toMatch(/add -e/);
+    expect(de("Hand", "die")).toMatch(/-en or -n/);
+    expect(pluralTip("lápiz", "es-ES")).toMatch(/-ces/);
+    expect(pluralTip("lunes", "es-ES")).toMatch(/don't change/);
+    expect(pluralTip("rubí", "es-ES")).toMatch(/vowel/);
+    expect(pluralTip("journal", "fr-FR")).toMatch(/-aux/);
+    expect(pluralTip("amica", "it-IT", "la")).toMatch(/-che/);
+    expect(pluralTip("problema", "it-IT", "il")).toMatch(/Masculine/);
+    expect(pluralTip("casa", "it-IT", "la")).toMatch(/to -e/);
+    expect(pluralTip("canção", "pt-BR")).toMatch(/-ões/);
   });
 });
 
@@ -179,5 +235,33 @@ describe("daily review answers", () => {
       "2026-03-01",
       "2026-03-02",
     ]);
+  });
+});
+
+describe("articles inside Learn", () => {
+  it("shows the full forms of a noun, adding a stored article", () => {
+    expect(nounForms({ term: "Buch", article: "das", plural: "Bücher" }, "de-DE")).toEqual({
+      article: "das",
+      noun: "Buch",
+      full: "das Buch",
+      plural: "Bücher",
+      pluralFull: "die Bücher",
+    });
+    expect(nounForms({ term: "der Hund", article: null, plural: null }, "de-DE")).toMatchObject({ article: "der", full: "der Hund", pluralFull: null });
+    expect(nounForms({ term: "gehen" }, "de-DE")).toMatchObject({ article: null, full: "gehen" });
+    expect(nounForms({ term: "dog", article: "der" }, "en-US")).toMatchObject({ article: null, full: "dog" });
+    expect(articleGender("die", "de-DE")).toBe("f");
+    expect(articleGender("l'", "fr-FR")).toBeNull();
+  });
+
+  it("a written noun needs its article", () => {
+    const forms = nounForms({ term: "Buch", article: "das" }, "de-DE");
+    const opts = { genderArticles: ["der", "die", "das"], lang: "de-DE" };
+    expect(checkNounAnswer("das Buch", forms, opts)).toMatchObject({ verdict: "correct", correct: true });
+    expect(checkNounAnswer("Das buch", forms, opts).correct).toBe(true);
+    expect(checkNounAnswer("Buch", forms, opts)).toMatchObject({ verdict: "article", correct: false, expected: "das Buch" });
+    expect(checkNounAnswer("der Buch", forms, opts)).toMatchObject({ verdict: "article", correct: false });
+    expect(checkNounAnswer("das Buh", forms, opts).verdict).toBe("typo");
+    expect(checkNounAnswer("Heft", forms, opts).verdict).toBe("wrong");
   });
 });

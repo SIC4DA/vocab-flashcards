@@ -43,7 +43,6 @@ export async function autoFillImage(
     hasUpload: boolean;
     noImage?: boolean;
     imageQuery?: string | null;
-    groupLabel?: string | null;
   },
   definitionLang: string,
   geminiKey: string | null,
@@ -51,8 +50,8 @@ export async function autoFillImage(
   if (card.imageUrl || card.hasUpload || card.noImage) return null;
   try {
     const db = await getDb();
-    // Not organised by AI yet and clearly a verb → skip the picture.
-    if (!card.imageQuery && !card.groupLabel && looksUnpicturable(card.definition, definitionLang)) {
+    // Clearly a verb or abstract word → skip the picture.
+    if (!card.imageQuery && looksUnpicturable(card.definition, definitionLang)) {
       await db.update(schema.cards).set({ noImage: true }).where(eq(schema.cards.id, card.id));
       return { noImage: true };
     }

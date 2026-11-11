@@ -51,10 +51,12 @@ export function GrammarGame({
   const lang = initialCards[0]?.termLang ?? "";
   const [cards, setCards] = useState(initialCards);
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
-  const playable = useMemo(
+  const nouns = useMemo(
     () => cards.filter((c) => cardArticle({ term: c.term, article: c.article ?? null }, lang) || hasPlural(c.plural)),
     [cards, lang],
   );
+  // Only nouns already met in Learn: the game practises forms you've seen, it doesn't make you guess.
+  const playable = useMemo(() => nouns.filter((c) => c.progress.stage >= 1), [nouns]);
   const newRound = () =>
     buildGrammarRound(
       playable.map((c) => ({ id: c.id, term: c.term, definition: c.definition, article: c.article ?? null, plural: c.plural ?? null })),
@@ -112,6 +114,7 @@ export function GrammarGame({
     setAnswer(null);
   }
 
+  if (queue.length === 0 && nouns.length > 0) return <NotSeenYet deckId={deckId} count={nouns.length} title={title} exitHref={exitHref} />;
   if (queue.length === 0) return <NoNouns deckId={deckId} lang={lang} title={title} exitHref={exitHref} />;
   if (done) return <Score results={results} byId={byId} lang={lang} exitHref={exitHref} onPlayAgain={playAgain} />;
 
@@ -297,7 +300,7 @@ function GrammarFeedback({
     btn.current?.focus({ preventScroll: true });
   }, []);
   const article = cardArticle({ term: card.term, article: card.article ?? null }, lang);
-  const tip = answer.correct ? null : q.kind === "article" ? articleTip(q.noun, lang) : pluralTip(q.noun, lang);
+  const tip = answer.correct ? null : q.kind === "article" ? articleTip(q.noun, lang) : pluralTip(q.noun, lang, article);
   return (
     <div
       className={`mt-5 border-l-4 px-4 py-3 ${answer.correct ? "border-success bg-success-soft" : "border-danger bg-danger-soft"}`}
@@ -444,6 +447,26 @@ function NoNouns({ deckId, lang, title, exitHref }: { deckId: string; lang: stri
             Articles &amp; plurals is for languages whose nouns have a gender: German, French, Spanish, Italian and Portuguese.
           </p>
         )}
+      </EmptyState>
+    </div>
+  );
+}
+
+/** The deck has nouns, but none has been met in Learn yet. */
+function NotSeenYet({ deckId, count, title, exitHref }: { deckId: string; count: number; title: string; exitHref: string }) {
+  return (
+    <div className="mx-auto max-w-2xl">
+      <SessionHeader title={title} exitHref={exitHref} />
+      <EmptyState title="Meet the words in Learn first">
+        <p className="mx-auto max-w-md" data-testid="grammar-not-seen">
+          This deck has {count} nouns with an article or plural. Learn shows each one with its article and plural; once
+          you’ve met a noun there, it joins this game.
+        </p>
+        <div className="mt-5 flex justify-center">
+          <Link href={`/decks/${deckId}/study/learn`} className="btn-primary">
+            Go to Learn
+          </Link>
+        </div>
       </EmptyState>
     </div>
   );

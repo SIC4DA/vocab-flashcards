@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as pronounce from "@/app/api/pronounce/route";
-import * as organize from "@/app/api/decks/[id]/organize/route";
 import * as autoImage from "@/app/api/cards/[id]/auto-image/route";
 import * as geminiKey from "@/app/api/account/gemini-key/route";
-import * as deck from "@/app/api/decks/[id]/route";
-import * as deckCards from "@/app/api/decks/[id]/cards/route";
 import { call } from "../support/route";
 import { createDeck, registerUser } from "../support/fixtures";
 
@@ -19,13 +16,6 @@ function mockFetch(handler: (url: string, init?: RequestInit) => Response | Prom
   return fn;
 }
 const AQ_KEY = "AQ.Ab8RN6Integration-Key_123.xyz7890";
-
-async function withKey(cookie: string) {
-  mockFetch(() => json({ totalTokens: 2 }));
-  const r = await call(geminiKey.PUT, { method: "PUT", cookie, body: { apiKey: AQ_KEY } });
-  expect(r.status).toBe(200);
-  globalThis.fetch = realFetch;
-}
 
 describe("new-format Gemini keys", () => {
   it("accepts an AQ. key verified via countTokens", async () => {
@@ -101,7 +91,7 @@ describe("pronunciation recordings", () => {
   });
 });
 
-describe("smart pictures and topics", () => {
+describe("smart pictures", () => {
   it("without AI, English verb definitions get no picture", async () => {
     const a = await registerUser("noai_pics");
     const { cards } = await createDeck(a.cookie, [{ term: "buchstabieren", definition: "to spell" }]);
@@ -109,83 +99,5 @@ describe("smart pictures and topics", () => {
     const r = await call(autoImage.POST, { method: "POST", cookie: a.cookie, params: { id: cards[0].id } });
     expect(r.json.image).toEqual({ noImage: true });
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("organize: AI decides pictures and topics, keeps the user's own picture choices", async () => {
-    const a = await registerUser("organizer");
-    const { deckId, cards } = await createDeck(a.cookie, [
-      { term: "das Handtuch", definition: "towel" },
-      { term: "buchstabieren", definition: "to spell" },
-      { term: "die Wurst", definition: "sausage" },
-      { term: "denken", definition: "to think" },
-    ]);
-    // Give "to spell" an automatic picture and "to think" a picture the user picked.
-    await call(deckCards.PUT, {
-      method: "PUT",
-      cookie: a.cookie,
-      params: { id: deckId },
-      body: {
-        cards: [
-          { id: cards[0].id, term: "das Handtuch", definition: "towel" },
-          { id: cards[1].id, term: "buchstabieren", definition: "to spell", imageUrl: "https://img.test/spell.jpg", imageSource: "auto" },
-          { id: cards[2].id, term: "die Wurst", definition: "sausage" },
-          { id: cards[3].id, term: "denken", definition: "to think", imageUrl: "https://img.test/think.jpg", imageSource: "picked" },
-        ],
-      },
-    });
-    expect((await call(organize.POST, { cookie: a.cookie, params: { id: deckId }, body: {} })).status).toBe(404); // no key yet
-    await withKey(a.cookie);
-    let prompt = "";
-    mockFetch(async (_url, init) => {
-      prompt = JSON.parse(String(init?.body)).contents[0].parts[0].text;
-      return json({
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text: JSON.stringify([
-                    { i: 0, image: true, keyword: "bath towel", group: "Bathroom" },
-                    { i: 1, image: false, keyword: "", group: "Everyday verbs" },
-                    { i: 2, image: true, keyword: "sausage", group: "Food" },
-                    { i: 3, image: false, keyword: "", group: "Everyday verbs" },
-                  ]),
-                },
-              ],
-            },
-          },
-        ],
-      });
-    });
-    const r = await call(organize.POST, { cookie: a.cookie, params: { id: deckId }, body: {} });
-    expect(r.status).toBe(200);
-    expect(prompt).toContain("buchstabieren");
-    expect(r.json.cards.find((c: { id: string }) => c.id === cards[1].id)).toMatchObject({ noImage: true, imageRemoved: true });
-    const d = await call(deck.GET, { cookie: a.cookie, params: { id: deckId } });
-    const byTerm = Object.fromEntries(d.json.cards.map((c: { term: string }) => [c.term, c]));
-    expect(byTerm["buchstabieren"]).toMatchObject({ noImage: true, imageUrl: null, groupLabel: "Everyday verbs" });
-    expect(byTerm["denken"]).toMatchObject({ noImage: false, imageUrl: "https://img.test/think.jpg" }); // user's choice kept
-    expect(byTerm["das Handtuch"]).toMatchObject({ noImage: false, groupLabel: "Bathroom" });
-
-    // The AI keyword is used for the picture search
-    let searched = "";
-    mockFetch((url) => {
-      searched = url;
-      return json({ results: [{ url: "https://img.test/t.jpg", thumbnail: "https://img.test/t-thumb.jpg", width: 800, height: 600, filetype: "jpg" }] });
-    });
-    const img = await call(autoImage.POST, { method: "POST", cookie: a.cookie, params: { id: cards[0].id } });
-    expect(img.json.image.imageUrl).toBe("https://img.test/t-thumb.jpg");
-    expect(searched).toContain("q=bath+towel");
-
-    // Editing a word clears its topic so it gets re-organised
-    await call(deckCards.PUT, {
-      method: "PUT",
-      cookie: a.cookie,
-      params: { id: deckId },
-      body: { cards: d.json.cards.map((c: { id: string; term: string; definition: string }) => ({ id: c.id, term: c.term, definition: c.term === "die Wurst" ? "sausage / wurst" : c.definition })) },
-    });
-    const d2 = await call(deck.GET, { cookie: a.cookie, params: { id: deckId } });
-    expect(d2.json.cards.find((c: { term: string }) => c.term === "die Wurst").groupLabel).toBeNull();
-    expect(d2.json.cards.find((c: { term: string }) => c.term === "das Handtuch").groupLabel).toBe("Bathroom");
   });
 });
