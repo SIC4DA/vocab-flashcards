@@ -129,25 +129,6 @@ export async function geminiOrganize(
   );
 }
 
-/** Short practice sentences that use the deck's words (some as question → reply pairs). */
-export async function geminiGenerateSentences(
-  key: string,
-  words: { term: string; definition: string }[],
-  termLang: string,
-  definitionLang: string,
-  count: number,
-): Promise<unknown> {
-  return generateJson<unknown>(
-    key,
-    `Write ${count} short, natural, beginner-friendly ${languageName(termLang)} sentences for a learner whose own language is ` +
-      `${languageName(definitionLang)}. Each sentence must use at least one of these vocabulary words (in any grammatical form) ` +
-      `and otherwise only very common words: ${JSON.stringify(words.slice(0, 120).map((w) => `${w.term} (${w.definition})`))}. ` +
-      `About a third should be everyday questions with a typical short reply (e.g. "Wie heißt du?" → "Ich heiße Anna."). ` +
-      `Reply as a JSON array of objects: {"text": sentence, "translation": its ${languageName(definitionLang)} translation, ` +
-      `"reply": reply sentence or null, "replyTranslation": translation of the reply or null}. Max 12 words per sentence.`,
-  );
-}
-
 /** Returns raw 16-bit PCM (24 kHz mono) from Gemini TTS. */
 export async function geminiTts(key: string, text: string, lang: string): Promise<{ pcm: Buffer; sampleRate: number }> {
   const res = await call(key, geminiTtsModel(), {
@@ -213,4 +194,23 @@ export async function verifyGeminiKey(key: string): Promise<KeyCheck> {
   } catch {
     return { status: "unreachable" };
   }
+}
+
+/** Article (gender) and plural for a batch of nouns; non-nouns come back with nulls. */
+export async function geminiNounGrammar(
+  key: string,
+  items: { term: string; definition: string }[],
+  termLang: string,
+  articles: string[],
+): Promise<unknown> {
+  const list = items.map((c, i) => ({ i, term: c.term, meaning: c.definition }));
+  return generateJson<unknown>(
+    key,
+    `You check the grammar of ${languageName(termLang)} vocabulary for a learner.\n` +
+      `For EACH item return {"i": number, "article": string | null, "plural": string | null}.\n` +
+      `- If the item is a single noun: "article" is its singular definite article, one of ${JSON.stringify(articles)}; ` +
+      `"plural" is the plural form WITHOUT any article (e.g. German "Buch" → "Bücher"), or "—" if the noun has no plural.\n` +
+      `- If the item is not a noun (verb, adjective, phrase…): both null.\n` +
+      `Reply with a JSON array only, one object per item, same "i" values.\n\nItems: ${JSON.stringify(list)}`,
+  );
 }

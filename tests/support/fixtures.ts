@@ -9,8 +9,12 @@ export async function registerUser(username: string, password = "password123") {
   return { cookie: r.cookie!, user: r.json.user as { id: string; username: string } };
 }
 
-export async function createDeck(cookie: string, cards: { term: string; definition: string }[] = []) {
-  const d = await call(decks.POST, { cookie, body: { title: "Spanish", termLang: "es-ES", definitionLang: "en-US" } });
+export async function createDeck(
+  cookie: string,
+  cards: { term: string; definition: string; article?: string | null; plural?: string | null }[] = [],
+  termLang = "es-ES",
+) {
+  const d = await call(decks.POST, { cookie, body: { title: "Spanish", termLang, definitionLang: "en-US" } });
   if (d.status !== 201) throw new Error(`deck failed: ${d.text}`);
   const deckId = d.json.deck.id as string;
   let saved: { id: string; term: string }[] = [];

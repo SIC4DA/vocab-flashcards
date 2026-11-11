@@ -72,8 +72,9 @@ export type StudyCard = {
   imageAttribution: string | null;
   /** Topic group suggested by AI (null without a Gemini key). */
   group?: string | null;
-  /** Translation of the example (when the example comes from one of the deck's sentences). */
-  exampleTranslation?: string;
+  /** Noun grammar (Articles & plurals game). */
+  article?: string | null;
+  plural?: string | null;
   termLang: string;
   definitionLang: string;
   progress: Progress;
@@ -436,10 +437,8 @@ export function topicSummary(topics: Topic[]) {
 /* Daily Learn session                                                */
 /* ------------------------------------------------------------------ */
 
-export type SessionKind = "review" | "learning" | "new" | "sentence" | "sentence_review";
+export type SessionKind = "review" | "learning" | "new";
 
-/** Sentence ladder top (fill-in-the-blank → sentence → word order → Q&A → mastered). */
-export const SENTENCE_MAX_STAGE = 4;
 export type SessionItem = { id: string; kind: SessionKind };
 
 /**
@@ -451,8 +450,8 @@ export type SessionItem = { id: string; kind: SessionKind };
 export function doneToday(p: Progress, kind: SessionKind, today: string, stepsPerDay: number): boolean {
   if (p.dayKey !== today) return false;
   if ((p.dayWrong ?? 0) >= MAX_WRONG_PER_DAY) return true;
-  if (kind === "review" || kind === "sentence_review") return (p.dayCorrect ?? 0) >= 1;
-  if (p.stage >= (kind === "sentence" ? SENTENCE_MAX_STAGE : MAX_STAGE)) return true;
+  if (kind === "review") return (p.dayCorrect ?? 0) >= 1;
+  if (p.stage >= MAX_STAGE) return true;
   return p.stage - (p.dayStartStage ?? p.stage) >= stepsPerDay;
 }
 

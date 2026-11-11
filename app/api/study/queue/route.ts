@@ -1,11 +1,11 @@
 import { ApiError, ok, requireUser, route } from "@/lib/api";
+import { DAILY_MIN_STAGE, DAILY_SIZE, EXTRA_SIZE, planDailyReview } from "@/lib/daily";
 import {
-  examplesFromSentences,
-  getDeckSentences,
-  toStudySentence,
   localDay,
-  cardsForDecks,
-  decksWithDueCards,
+  createDailyReview,
+  dailyPool,
+  dailyStatus,
+  getDailyReview,
   getDeckCards,
   getOwnedDeck,
   localMidnight,
@@ -21,7 +21,7 @@ import {
   deckTopics,
   nextRoundIds,
   planLearnSession,
-  planReviewSession,
+  reviewQuestionType,
   shuffle,
   topicSummary,
   type SessionItem,
@@ -30,14 +30,6 @@ import {
   type StudyCard,
   type TestType,
 } from "@/lib/learn";
-import {
-  buildSentenceQuestion,
-  planSentences,
-  SENTENCE_MASTERED,
-  sentenceTypeForStage,
-  type SentenceQuestion,
-  type StudySentence,
-} from "@/lib/sentences";
 import { resolveSettings } from "@/lib/validation";
 
 export const runtime = "nodejs";
@@ -53,7 +45,7 @@ export type LearnSession = {
   bonus: number;
 };
 
-const MODES = ["learn", "review", "flashcards", "write", "listen", "match", "test", "sentences"] as const;
+const MODES = ["learn", "daily", "flashcards", "write", "listen", "match", "test", "grammar"] as const;
 type Mode = (typeof MODES)[number];
 const TEST_TYPES: TestType[] = ["mc", "write", "dictation", "true_false"];
 
@@ -74,42 +66,27 @@ export const GET = route(async (req) => {
   const now = new Date();
   const rand = Math.random;
 
+  if (mode === "daily") return ok(await dailyQueue(user.id, now, tz, Number(sp.get("bonus") ?? 0) || 0));
+
   let decks;
   let cards: StudyCard[];
-  let sentences: StudySentence[];
-  if (mode === "review") {
-    decks = await decksWithDueCards(user.id, now);
-    const deckById = new Map(decks.map((d) => [d.id, d]));
-    cards = (await cardsForDecks(decks.map((d) => d.id))).map(({ deckId, dto }) =>
-      toStudyCard(deckById.get(deckId)!, dto),
-    );
-    sentences = [];
-  } else {
+  {
     const deck = await getOwnedDeck(user.id, sp.get("deckId") ?? "");
     decks = [deck];
-    const dtos = await getDeckCards(deck.id);
-    const sentenceDtos = await getDeckSentences(deck.id, new Map(dtos.map((c) => [c.id, c.progress.stage])));
-    // Words without their own example borrow one from the deck's sentences (shown on the card back).
-    const examples = examplesFromSentences(sentenceDtos);
-    cards = dtos.map((c) => {
-      const sc = toStudyCard(deck, c);
-      const ex = examples.get(c.id);
-      return !sc.example && ex ? { ...sc, example: ex.text, exampleTranslation: ex.translation } : sc;
-    });
-    sentences = sentenceDtos.map((x) => toStudySentence(deck, x));
+    cards = (await getDeckCards(deck.id)).map((c) => toStudyCard(deck, c));
   }
 
   const deckSizes = new Map<string, StudyCard[]>();
   for (const c of cards) deckSizes.set(c.deckId, [...(deckSizes.get(c.deckId) ?? []), c]);
   const peers = (c: StudyCard) => deckSizes.get(c.deckId) ?? [];
 
-  let questions: (Question | SentenceQuestion)[] = [];
+  let questions: Question[] = [];
   let newAllowed = 0;
   let session: LearnSession | null = null;
   const questionFor = (c: StudyCard) =>
     buildQuestion(
       c,
-      questionTypeForStage(mode === "review" ? Math.max(1, c.progress.stage) : c.progress.stage, c.progress.correctStreak, {
+      questionTypeForStage(c.progress.stage, c.progress.correctStreak, {
         deckSize: peers(c).length,
         rand,
       }),
@@ -117,44 +94,19 @@ export const GET = route(async (req) => {
       rand,
     );
 
-  if (mode === "learn" || mode === "review" || mode === "sentences") {
+  if (mode === "learn") {
     // "Keep going" after the daily session: each bonus level allows one more step per word and 5 more new words.
     const bonus = Math.max(0, Math.min(3, Number(sp.get("bonus") ?? 0) || 0));
     const today = localDay(now, tz);
     const stepsPerDay = settings.stepsPerDay + bonus;
-    let items: SessionItem[];
-    let topic: string | null = null;
-    let topics: ReturnType<typeof topicSummary> | null = null;
-    const sentenceItems = (limit: number): SessionItem[] =>
-      planSentences(sentences, { now, today, stepsPerDay, limit }).map((x) => ({
-        id: x.id,
-        kind: x.progress.stage >= SENTENCE_MASTERED ? ("sentence_review" as const) : ("sentence" as const),
-      }));
-    if (mode === "learn") {
-      newAllowed = newAllowedToday(settings, await newCardsIntroducedToday(user.id, localMidnight(now, tz))) + bonus * 5;
-      const plan = planLearnSession(cards, { now, today, newAllowed, stepsPerDay });
-      // Unlocked sentences join the end of the daily session.
-      items = [...plan.items, ...sentenceItems(settings.sentencesPerDay + bonus * 3)];
-      topic = plan.topic?.label ?? null;
-      topics = topicSummary(deckTopics(cards));
-    } else if (mode === "sentences") {
-      items = sentenceItems(20 + bonus * 10);
-    } else {
-      items = planReviewSession(cards, now);
-    }
+    newAllowed = newAllowedToday(settings, await newCardsIntroducedToday(user.id, localMidnight(now, tz))) + bonus * 5;
+    const plan = planLearnSession(cards, { now, today, newAllowed, stepsPerDay });
+    const items: SessionItem[] = plan.items;
+    const topic = plan.topic?.label ?? null;
+    const topics = topicSummary(deckTopics(cards));
     const byId = new Map(cards.map((c) => [c.id, c]));
-    const sById = new Map(sentences.map((x) => [x.id, x]));
-    const progressOf = (id: string) => (byId.get(id) ?? sById.get(id)!).progress;
-    const first = nextRoundIds(items, progressOf, { today, stepsPerDay, roundSize: settings.roundSize });
-    questions = first.map((id) => {
-      const st = sById.get(id);
-      if (!st) return questionFor(byId.get(id)!);
-      return buildSentenceQuestion(st, sentenceTypeForStage(st, st.progress.stage, rand), {
-        cards,
-        peers: sentences.filter((x) => x.unlocked),
-        rand,
-      });
-    });
+    const first = nextRoundIds(items, (id) => byId.get(id)!.progress, { today, stepsPerDay, roundSize: settings.roundSize });
+    questions = first.map((id) => questionFor(byId.get(id)!));
     session = { items, today, stepsPerDay, topic, topics, bonus };
   } else if (mode === "test") {
     const types = (sp.get("types") ?? "mc,write,dictation,true_false")
@@ -185,6 +137,47 @@ export const GET = route(async (req) => {
     questions,
     newAllowed,
     session,
-    sentences,
   });
 });
+
+/**
+ * Daily review: today's fixed word list (picked on the first visit of the day), minus words already answered.
+ * `bonus` > 0 is "Keep reviewing": another short batch of known words not reviewed today.
+ */
+async function dailyQueue(userId: string, now: Date, tz: number, bonus: number) {
+  const today = localDay(now, tz);
+  const rand = Math.random;
+  // Every word with progress, so today's list still resolves if a word slipped back a stage since the morning.
+  const all = await dailyPool(userId, 1);
+  const byId = new Map(all.map((c) => [c.id, c]));
+  let row = await getDailyReview(userId, today);
+  let picked: StudyCard[];
+  if (bonus > 0) {
+    const reviewedToday = all.filter((c) => c.progress.lastReviewedAt && localDay(new Date(c.progress.lastReviewedAt), tz) === today);
+    const exclude = new Set([...(row?.cardIds ?? []), ...reviewedToday.map((c) => c.id)]);
+    picked = planDailyReview(all, now, { size: EXTRA_SIZE, exclude });
+  } else {
+    if (!row) {
+      const plan = planDailyReview(all, now, { size: DAILY_SIZE });
+      if (plan.length) row = await createDailyReview(userId, today, plan.map((c) => c.id));
+    }
+    const answered = new Set(row?.answeredIds ?? []);
+    picked = row && !row.completedAt ? row.cardIds.filter((id) => !answered.has(id) && byId.has(id)).map((id) => byId.get(id)!) : [];
+    picked = shuffle(picked, rand);
+  }
+  const deckPeers = new Map<string, StudyCard[]>();
+  for (const c of all) deckPeers.set(c.deckId, [...(deckPeers.get(c.deckId) ?? []), c]);
+  const questions = picked.map((c) => {
+    const peers = deckPeers.get(c.deckId) ?? [c];
+    return buildQuestion(c, reviewQuestionType(rand, peers.length), peers, rand);
+  });
+  return {
+    mode: "daily",
+    decks: [],
+    cards: picked,
+    questions,
+    newAllowed: 0,
+    session: null,
+    daily: { ...dailyStatus(row, today), known: all.filter((c) => c.progress.stage >= DAILY_MIN_STAGE).length, bonus },
+  };
+}

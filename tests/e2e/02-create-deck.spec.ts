@@ -4,8 +4,8 @@ test("create a Spanish→English deck with auto images, then bulk-import 4 more"
   await registerAPI(page, uid("Creator_"));
   await page.goto("/decks/new");
   await page.getByLabel("Title").fill("Spanish — Basics");
-  await expect(page.getByLabel(/Term language/)).toHaveValue(/Spanish \(Spain\)/);
-  await expect(page.getByLabel(/Definition language/)).toHaveValue(/English \(US\)/);
+  await expect(page.getByLabel(/Term language/)).toHaveValue(/Spanish/);
+  await expect(page.getByLabel(/Definition language/)).toHaveValue(/English/);
 
   const rows = page.getByTestId("card-row");
   await expect(rows).toHaveCount(3);

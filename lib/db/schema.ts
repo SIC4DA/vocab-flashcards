@@ -8,6 +8,7 @@ import {
   integer,
   real,
   index,
+  uniqueIndex,
   customType,
 } from "drizzle-orm/pg-core";
 
@@ -97,6 +98,11 @@ export const cards = pgTable(
     imageQuery: text("image_query"),
     /** Topic group suggested by AI (e.g. "Kitchen"), used to introduce related words together. */
     groupLabel: text("group_label"),
+    /** Noun grammar for the Articles & plurals game: definite article (der/die/das, el/la, …) and plural form. */
+    article: text("article"),
+    plural: text("plural"),
+    /** True once the article/plural lookup (Wiktionary / Gemini) has run, so it isn't repeated. */
+    grammarChecked: boolean("grammar_checked").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -131,50 +137,6 @@ export const cardProgress = pgTable(
   (t) => [index("card_progress_due_at_idx").on(t.dueAt)],
 );
 
-/** Example / practice sentences of a deck (optionally a question with its reply). */
-export const sentences = pgTable(
-  "sentences",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    deckId: uuid("deck_id")
-      .notNull()
-      .references(() => decks.id, { onDelete: "cascade" }),
-    position: integer("position").notNull(),
-    text: text("text").notNull(),
-    translation: text("translation").notNull().default(""),
-    /** For question-and-answer pairs: the reply sentence ("Wie heißt du?" → "Ich heiße Anna."). */
-    reply: text("reply"),
-    replyTranslation: text("reply_translation"),
-    /** Deck words found in the sentence (recomputed when cards or sentences change). */
-    cardIds: jsonb("card_ids").$type<string[]>().notNull().default([]),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [index("sentences_deck_position_idx").on(t.deckId, t.position)],
-);
-
-/** Learning progress of a sentence (same shape as card progress; ladder stages 0–4). */
-export const sentenceProgress = pgTable("sentence_progress", {
-  sentenceId: uuid("sentence_id")
-    .primaryKey()
-    .references(() => sentences.id, { onDelete: "cascade" }),
-  stage: integer("stage").notNull().default(0),
-  ease: real("ease").notNull().default(2.5),
-  intervalDays: real("interval_days").notNull().default(0),
-  dueAt: timestamp("due_at", { withTimezone: true }).notNull().defaultNow(),
-  reps: integer("reps").notNull().default(0),
-  lapses: integer("lapses").notNull().default(0),
-  correctStreak: integer("correct_streak").notNull().default(0),
-  lastReviewedAt: timestamp("last_reviewed_at", { withTimezone: true }),
-  modeStats: jsonb("mode_stats").$type<ModeStats>().notNull().default({}),
-  dayKey: text("day_key"),
-  dayStartStage: integer("day_start_stage").notNull().default(0),
-  dayWrong: integer("day_wrong").notNull().default(0),
-  dayCorrect: integer("day_correct").notNull().default(0),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
-
 export const reviewLog = pgTable(
   "review_log",
   {
@@ -193,6 +155,26 @@ export const reviewLog = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index("review_log_user_created_idx").on(t.userId, t.createdAt)],
+);
+
+/** One row per user per local day: the words picked for that day's Daily review and when it was finished. */
+export const dailyReviews = pgTable(
+  "daily_reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Local day (YYYY-MM-DD). */
+    day: text("day").notNull(),
+    cardIds: jsonb("card_ids").$type<string[]>().notNull().default([]),
+    /** Card ids answered so far today (first answer per card). */
+    answeredIds: jsonb("answered_ids").$type<string[]>().notNull().default([]),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("daily_reviews_user_day_idx").on(t.userId, t.day)],
 );
 
 /** Cache of Gemini TTS output (WAV), keyed by sha256(text+lang+voice). */
@@ -230,3 +212,4 @@ export type User = typeof users.$inferSelect;
 export type Deck = typeof decks.$inferSelect;
 export type Card = typeof cards.$inferSelect;
 export type CardProgress = typeof cardProgress.$inferSelect;
+export type DailyReview = typeof dailyReviews.$inferSelect;

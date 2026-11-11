@@ -38,6 +38,15 @@ const server = http.createServer((req, res) => {
       });
     }
     if (url.pathname === "/w/api.php") {
+      // Wiktionary noun tables (Articles & plurals lookup for German).
+      if (url.searchParams.get("action") === "parse") {
+        const NOUNS = { Hund: ["m", "Hunde"], Buch: ["n", "Bücher"], Zeitung: ["f", "Zeitungen"] };
+        const n = NOUNS[url.searchParams.get("page") ?? ""];
+        if (!n) return send(res, 200, { error: { code: "missingtitle" } });
+        return send(res, 200, {
+          parse: { wikitext: `{{Deutsch Substantiv Übersicht\n|Genus=${n[0]}\n|Nominativ Plural=${n[1]}\n}}` },
+        });
+      }
       // Wiktionary pronunciation lookup: only "Hund" has a recording in this mock.
       if (url.searchParams.get("generator") === "images" && (url.searchParams.get("titles") ?? "").split("|").includes("Hund")) {
         return send(res, 200, {
@@ -103,6 +112,11 @@ const server = http.createServer((req, res) => {
             ),
           ),
         );
+      }
+      if (body.includes("You check the grammar of")) {
+        const text = JSON.parse(body).contents[0].parts[0].text;
+        const items = JSON.parse(text.slice(text.indexOf("Items: ") + 7));
+        return send(res, 200, gemini(JSON.stringify(items.map((c) => ({ i: c.i, article: null, plural: null })))));
       }
       if (body.includes("search keyword")) return send(res, 200, gemini('{"keyword":"object"}'));
       if (body.includes("Translate the")) return send(res, 200, gemini('{"translation":"gemini meaning","example":"Ejemplo."}'));

@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiClientError, tzOffset } from "@/lib/client/api";
 import { FlashcardsMode } from "./flashcards-mode";
+import { GrammarGame } from "./grammar-game";
 import { MatchGame } from "./match-game";
 import { StudySession, type QueuePayload } from "./session";
 import { TestRunner } from "./test-runner";
 
-export type StudyMode = "learn" | "flashcards" | "write" | "listen" | "match" | "test" | "review" | "sentences";
+export type StudyMode = "learn" | "flashcards" | "write" | "listen" | "match" | "test" | "daily" | "grammar";
 
 function SessionSkeleton() {
   return (
@@ -67,6 +68,8 @@ export function StudyLoader({
   switch (mode) {
     case "flashcards":
       return <FlashcardsMode cards={payload.cards} title={title} exitHref={exitHref} />;
+    case "grammar":
+      return <GrammarGame deckId={deckId!} cards={payload.cards} title={title} exitHref={exitHref} />;
     case "match":
       return (
         <MatchGame deckId={deckId!} cards={payload.cards} title={title} exitHref={exitHref} initialBestMs={matchBestMs ?? null} />
@@ -80,7 +83,7 @@ export function StudyLoader({
           title={title}
           exitHref={exitHref}
           onKeepGoing={
-            (mode === "learn" || mode === "sentences") && bonus < 3
+            (mode === "learn" && bonus < 3) || mode === "daily"
               ? () => {
                   setPayload(null);
                   setBonus((b) => b + 1);

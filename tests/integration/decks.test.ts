@@ -206,7 +206,7 @@ describe("review", () => {
     expect(d.json.deck.lastStudiedAt).toBeTruthy();
     const dueNow = await call(due.GET, { cookie: a.cookie, url: "/api/study/due?tz=0" });
     expect(dueNow.json.total).toBe(1); // the wrong answer made the card due again
-    expect(dueNow.json.streak).toBe(1);
+    expect(dueNow.json.streak).toBe(0); // only a finished daily review counts towards the streak
   });
 
   it("builds a learn queue with distractors from the deck", async () => {

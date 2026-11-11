@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { computeStreak, localDay } from "@/lib/data";
 import { pcmToWav } from "@/lib/gemini";
 import { pickBestImage } from "@/lib/images";
-import { getLanguage, isRtl, LANGUAGES } from "@/lib/languages";
+import { genderArticles, getLanguage, isRtl, LANGUAGES } from "@/lib/languages";
 import { levenshtein, similarity } from "@/lib/text";
 
 describe("streak", () => {
@@ -47,13 +47,16 @@ describe("wav", () => {
 });
 
 describe("languages", () => {
-  it("has ~30 languages with RTL flags", () => {
-    expect(LANGUAGES.length).toBeGreaterThanOrEqual(30);
+  it("keeps one version of each of the 7 languages", () => {
+    expect(LANGUAGES.map((l) => l.name)).toEqual(["English", "Spanish", "French", "German", "Italian", "Portuguese", "Arabic"]);
     expect(isRtl("ar-SA")).toBe(true);
-    expect(isRtl("he-IL")).toBe(true);
-    expect(isRtl("fa-IR")).toBe(true);
     expect(isRtl("es-ES")).toBe(false);
-    expect(getLanguage("es-AR").name).toContain("Spanish");
+    expect(getLanguage("es-AR").name).toBe("Spanish");
+    // Removed variants map onto the kept one.
+    expect(getLanguage("en-GB").code).toBe("en-US");
+    expect(getLanguage("pt-PT").code).toBe("pt-BR");
+    expect(genderArticles("de-DE")).toEqual(["der", "die", "das"]);
+    expect(genderArticles("en-US")).toEqual([]);
   });
   it("levenshtein/similarity", () => {
     expect(levenshtein("kitten", "sitting")).toBe(3);

@@ -15,15 +15,16 @@ Pictures and pronunciation are automatic and need no API keys. AI extras are opt
 ## Features
 
 - **Accounts** — username + password (no email). Sessions are signed HTTP-only cookies. Brute-force lockout after 10 failed logins in 15 minutes.
-- **Decks & cards** — ~30 languages (with flags and right-to-left support), drag-and-drop or ↑/↓ reordering, undo on delete, Tab-to-add-row, bulk import (tab, comma or ` - `) with live preview, CSV export, duplicate/delete deck.
+- **Decks & cards** — 7 languages — English, Spanish, French, German, Italian, Portuguese and Arabic (with right-to-left support), drag-and-drop or ↑/↓ reordering, undo on delete, Tab-to-add-row, bulk import (tab, comma or ` - `) with live preview, CSV export, duplicate/delete deck.
 - **Smart images** — pictures only where they help (objects, food, colours…, not "to spell"). Found on Openverse (Wikimedia Commons as fallback) when you save; with a Gemini key, AI decides per word and picks the search keyword. Pick another, upload your own (resized to 512 px WebP in the browser), paste a URL or remove it. Licence attribution is shown on the card.
 - **Topics** — with a Gemini key, words are grouped by theme and Learn introduces new words topic by topic.
 - **Pronunciation** — real native-speaker recordings from Wiktionary/Wikimedia Commons when available (free, no key), otherwise the best-sounding voice on the device; optional Gemini cloud voice with the user's own key. Slow replay.
-- **Study modes** — Flashcards (3D flip, swipe), **Learn** (adaptive ladder), Write, Listen (dictation), Match (timed, best time saved), Test (generated exam with pass mark), and **Review all due** across decks.
-- **Sentences (words in context)** — import or generate sentences (and question → reply pairs). Each one unlocks once you've mastered its words, then climbs its own ladder: fill in the blank → sentence card → word-order puzzle → question & answer matching. Unlocked sentences join the daily Learn session; word cards show an example sentence on the back (tap "Example ▸").
+- **Study modes** — Flashcards (3D flip, swipe), **Learn** (adaptive ladder), Write, Listen (dictation), Match (timed, best time saved), Test (generated exam with pass mark), and **Articles & plurals** (a game for der/die/das and plural forms).
+- **Daily review + streak** — a light ~10-minute session across all decks with words you already know, the most-missed first. The streak counts only days on which you finished it; "Keep reviewing" offers more.
+- **Articles & plurals** — a separate game per deck (German, French, Spanish, Italian, Portuguese): pick the article, pick then type the plural, with a tip for the pattern after a mistake. Articles and plurals come from the term ("das Buch"), the editor, bulk import (`das Buch, die Bücher - book`), German Wiktionary, or the user's Gemini key.
 - **Smart answer checking** — ignores case/spacing/trailing punctuation, accepts `car / automobile` alternatives, “watch the accents”, typo tolerance with an “I was right” override, optional article-ignoring, on-screen special-character bar.
 - **Spaced repetition** — simplified SM-2. Progress is saved after every single answer.
-- **Stats** — stage bar (New / Learning / Mastered), due today, accuracy by mode, per-card table with reset, daily streak.
+- **Stats** — stage bar (New / Learning / Mastered), due today, accuracy by mode, per-card table with reset, daily-review streak with the last 7 days.
 - **In-app guide** — a "📖 Guide" page explains the learning ladder (when a word counts as learned), every mode, answer checking, reviews, settings and AI setup.
 - **Polish** — light/dark theme, keyboard shortcuts (`?` shows them), sound effects, skeletons, toasts, accessible markup, works on a 360 px phone.
 

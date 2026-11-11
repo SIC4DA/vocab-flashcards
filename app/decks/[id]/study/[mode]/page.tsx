@@ -3,15 +3,15 @@ import { notFound } from "next/navigation";
 import { StudyLoader, type StudyMode } from "@/components/study/study-loader";
 import { loadDeckForPage } from "@/lib/page-data";
 
-const MODES: StudyMode[] = ["learn", "flashcards", "write", "listen", "match", "test", "sentences"];
+const MODES: StudyMode[] = ["learn", "flashcards", "write", "listen", "match", "test", "grammar"];
 const TITLES: Record<string, string> = {
   learn: "Learn",
   flashcards: "Flashcards",
   write: "Write",
   listen: "Listen",
-  sentences: "Sentences",
   match: "Match",
   test: "Test",
+  grammar: "Articles & plurals",
 };
 
 export async function generateMetadata({ params }: PageProps<"/decks/[id]/study/[mode]">): Promise<Metadata> {

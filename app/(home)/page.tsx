@@ -23,7 +23,8 @@ function Landing() {
   const extras = [
     ["Native recordings", "Real speakers from Wiktionary for most single words, your device’s best voice for the rest."],
     ["Pictures only where they help", "A photo for a towel or a sausage; none for “to spell”."],
-    ["Sentences", "Unlock a sentence by mastering its words, then fill gaps, order words, and match questions to replies."],
+    ["Daily review", "Ten light minutes a day with the words you already know, the ones you keep missing first. Finish it to keep your streak."],
+    ["Articles & plurals", "A separate game just for der, die, das and Buch → Bücher."],
     ["Match and Test", "Pair words against the clock, or take an exam built from your deck."],
   ];
   return (

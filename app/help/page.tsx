@@ -9,10 +9,11 @@ const TOC = [
   ["start", "Quick start"],
   ["learned", "When is a word “learned”?"],
   ["daily", "Your daily Learn session"],
-  ["sentences", "Sentences: words in context"],
+  ["review", "Daily review and your streak"],
   ["modes", "Study modes"],
+  ["grammar", "Articles & plurals"],
   ["which-modes", "Which modes count towards mastering?"],
-  ["reviews", "Reviews, due cards and streaks"],
+  ["reviews", "Spaced repetition and due words"],
   ["checking", "How answers are checked"],
   ["audio", "Audio and pronunciation"],
   ["images", "Pictures"],
@@ -90,8 +91,8 @@ export default async function HelpPage() {
           found automatically.
         </li>
         <li>
-          <b>Press Learn</b> on the deck and practise for a few minutes every day. Come back when the dashboard shows cards
-          <b> due today</b> and press <b>Review all due</b>.
+          <b>Press Learn</b> on the deck and practise for a few minutes every day. Once you know some words, do the{" "}
+          <b>Daily review</b> on the dashboard every day to keep them — and your streak.
         </li>
       </ol>
 
@@ -190,44 +191,35 @@ export default async function HelpPage() {
         </li>
       </ul>
 
-      <H2 id="sentences">Sentences: words in context</H2>
+      <H2 id="review">Daily review and your streak</H2>
       <p>
-        Words stick better when you meet them in real sentences. Add sentences to a deck in the editor (type them, use{" "}
-        <b>Bulk import → Sentences</b>, or <b>Generate sentences</b> with your Gemini key). The app finds which of the
-        deck’s words each sentence uses, even when they’re conjugated (<i>kommen</i> → <i>kommst</i>).
+        The <b>Daily review</b> on the dashboard is a light session — about <b>10 minutes</b>, not a timer — with words you
+        already know, from all your decks. It’s there to build a habit: open the app each day and refresh what you’ve
+        learned.
       </p>
       <ul className="list-disc space-y-2 pl-6">
         <li>
-          <b>Unlock:</b> a sentence unlocks once you’ve <b>mastered every deck word in it</b>. It’s a reward for learning the
-          words; the deck page shows which words a locked sentence still needs.
+          <b>Which words:</b> words you’ve written from memory in Learn (Written or Mastered). Words that are due come first,
+          then the ones you’ve <b>missed most often</b>, then the ones you haven’t seen for longest. Up to 25 a day — fewer
+          if you don’t know that many words yet.
         </li>
         <li>
-          <b>Each sentence climbs its own ladder</b> (one correct answer per step, {steps} step{steps === 1 ? "" : "s"} per day):
-          <ol className="mt-1 list-decimal space-y-1 pl-6">
-            <li>
-              <b>Fill in the blank</b>: “Mir geht’s ___ gut.” — pick the missing word.
-            </li>
-            <li>
-              <b>Sentence</b>: hear and read the whole sentence, reveal the translation, and say whether you understood it.
-            </li>
-            <li>
-              <b>Word order</b>: the sentence is scrambled (“du / kommst / woher”) — tap the words in the right order.
-            </li>
-            <li>
-              <b>Question &amp; answer</b> (only for sentences with a reply): match questions like “Wie heißt du?” with replies
-              like “Ich heiße …”.
-            </li>
-          </ol>
-          Then it’s mastered and comes back in spaced reviews (mostly word order and fill-in-the-blank).
+          <b>Questions</b> are mostly writing and dictation, with some multiple choice. A word you miss comes back once at
+          the end.
         </li>
         <li>
-          <b>Part of your daily session:</b> up to <b>{s.sentencesPerDay}</b> sentence exercises are added to the end of each
-          Learn session once sentences unlock (setting “Sentences per day”). The <b>Sentences</b> mode lets you practise
-          more.
+          <b>It doesn’t mess up your schedule:</b> a due word is reviewed as usual; a word you get wrong drops back and
+          returns sooner; a right answer to a word that isn’t due yet only counts in your stats.
         </li>
         <li>
-          <b>On word cards</b>, the back shows the meaning and an <b>Example ▸</b> button: the example sentence stays out of
-          the way until you want it. Words without their own example borrow one of the deck’s sentences.
+          <b>Today’s list is fixed</b> once you start: close the tab and come back, and you continue where you left off.
+        </li>
+        <li>
+          <b>Keep reviewing:</b> when you’re done you can keep going with 10 more known words at a time.
+        </li>
+        <li>
+          Your <b>streak</b> counts the days in a row on which you <b>finished the daily review</b>. Learn sessions and other
+          modes don’t count — only the daily review does. The dashboard shows the last 7 days.
         </li>
       </ul>
 
@@ -238,10 +230,10 @@ export default async function HelpPage() {
           ["🃏 Flashcards", "Flip cards (tap, click or Space). Sort them with “Know it” (→) or “Still learning” (←), or swipe on a phone. At the end you can study only the still-learning ones again. Options: shuffle, definition first."],
           ["✍️ Write", "Every word as a writing question in random order. Wrong ones come back at the end."],
           ["🎧 Listen", "Dictation: you only hear the word (🔊 replay, 🐢 slow) and type it."],
-          ["Sentences", "Practise unlocked sentences: fill in the blank, read, word order, question & answer."],
+          ["Articles & plurals", "A separate game for the gender and the plural of each noun (see below). German, French, Spanish, Italian and Portuguese decks."],
           ["🎯 Match", "Match 6 words with their meanings as fast as you can. Wrong pairs add 1 second. Your best time per deck is saved."],
           ["📝 Test", "A generated exam: choose how many questions and which types (multiple choice, write, listen & write, true/false). You get a score, pass/fail (pass mark in Settings), and can retake only the ones you missed."],
-          ["🔁 Review all due", "From the dashboard: practises every word that is due today, across all your decks."],
+          ["📅 Daily review", "From the dashboard: about 10 minutes with words you already know, across all your decks. Finishing it keeps your streak."],
         ].map(([t, d]) => (
           <div key={t} className="panel p-4">
             <dt className="font-bold">{t}</dt>
@@ -253,7 +245,8 @@ export default async function HelpPage() {
       <H2 id="which-modes">Which modes count towards mastering?</H2>
       <ul className="list-disc space-y-2 pl-6">
         <li>
-          <b>Learn</b> and <b>Review all due</b> move words up and down the ladder.
+          <b>Learn</b> moves words up and down the ladder. The <b>Daily review</b> reviews due words and sends missed
+          ones back to Written, but never moves a word up the ladder.
         </li>
         <li>
           <b>Flashcards</b>: “Know it” only moves a New word to Seen; it never makes a word Mastered.
@@ -263,12 +256,39 @@ export default async function HelpPage() {
           stats, but don’t climb the ladder (a mistake on a Mastered word still sends it back to Written).
         </li>
         <li>
-          <b>Match</b> is a game: it saves your best time but doesn’t change word progress.
+          <b>Match</b> and <b>Articles &amp; plurals</b> are games: they save your best time or your right/wrong counts but
+          don’t change word progress.
         </li>
         <li>Every answer is saved immediately — you can close the tab at any time without losing progress.</li>
       </ul>
 
-      <H2 id="reviews">Reviews, due cards and streaks</H2>
+      <H2 id="grammar">Articles &amp; plurals</H2>
+      <p>
+        A separate game that only drills the <b>article</b> (der / die / das, el / la, le / la, il / lo / la, o / a) and the{" "}
+        <b>plural</b> of each noun — not its meaning. Open it from the deck page.
+      </p>
+      <ul className="list-disc space-y-2 pl-6">
+        <li>
+          <b>Article:</b> you see “___ Buch” and pick der, die or das.
+        </li>
+        <li>
+          <b>Plural:</b> pick “Bücher” from four look-alike forms (Buche, Buchen, Bucher…). Once you’ve got a plural right,
+          next time you <b>type it</b> — umlauts and accents count (Bucher ≠ Bücher).
+        </li>
+        <li>
+          After a mistake you get the full forms (<i>das Buch → die Bücher</i>) and a <b>tip</b> for the pattern, e.g. “nouns
+          ending in -ung are die and add -en”. Missed questions come back once at the end; then you get your score and can
+          play again.
+        </li>
+        <li>
+          <b>Where the articles and plurals come from:</b> the article you write in front of the word (“das Buch”), the{" "}
+          <b>Article</b> and <b>Plural</b> fields in the editor, or a lookup when you save — German Wiktionary for German,
+          your Gemini key for other languages. In Bulk import you can write <code>das Buch, die Bücher - book</code>. Your
+          own entries are never overwritten.
+        </li>
+      </ul>
+
+      <H2 id="reviews">Spaced repetition and due words</H2>
       <p>
         The app uses <b>spaced repetition</b> (a simplified SM-2 algorithm) to bring words back right before you’d forget
         them.
@@ -282,12 +302,9 @@ export default async function HelpPage() {
           each time; faster, confident answers make the gaps grow faster).
         </li>
         <li>
-          A word is <b>due</b> when its review date has arrived. The dashboard shows how many are due today; press{" "}
-          <b>Review all due</b> to clear them. Mastered words are reviewed mostly by writing (60%), then dictation (25%) and
+          A word is <b>due</b> when its review date has arrived. Due words come up in each deck’s <b>Learn</b> session and
+          first in your <b>Daily review</b>. Mastered words are reviewed mostly by writing (60%), then dictation (25%) and
           multiple choice (15%).
-        </li>
-        <li>
-          Your <b>streak </b> counts the days in a row on which you answered at least one question.
         </li>
       </ul>
 
@@ -401,6 +418,9 @@ export default async function HelpPage() {
         </li>
         <li>A <b>cloud voice</b> when your device has no voice for a language (or always, with “Prefer cloud voice”).</li>
         <li>
+          <b>Articles &amp; plurals</b> for French, Spanish, Italian and Portuguese nouns (German uses Wiktionary).
+        </li>
+        <li>
           <b>Generate deck</b>: type a topic (e.g. “kitchen items”) and get up to 30 cards to review and edit before saving.
         </li>
       </ul>
@@ -423,7 +443,6 @@ export default async function HelpPage() {
           [`New words per day (now ${s.newPerDay})`, "How many new words Learn introduces per day."],
           [`Steps per word per day (now ${steps})`, "How far one word can climb in a day’s Learn session."],
           [`Learn round size (now ${s.roundSize})`, "How many words are in each Learn round."],
-          [`Sentences per day (now ${s.sentencesPerDay})`, "Sentence exercises added to the daily Learn session once sentences unlock."],
           [`Test pass mark (now ${s.passMark}%)`, "The score you need to pass a Test."],
           ["Theme", "Light, dark, or follow your device."],
         ].map(([t, d]) => (

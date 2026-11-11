@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiClientError } from "@/lib/client/api";
 import { resizeImage } from "@/lib/client/image-resize";
-import type { CardDTO, DeckDTO, SentenceDTO } from "@/lib/data";
-import { linkWords } from "@/lib/sentences";
+import type { CardDTO, DeckDTO } from "@/lib/data";
 import { parseImport, type Delimiter } from "@/lib/import-parser";
-import { parseSentenceImport, type ParsedSentence } from "@/lib/sentences";
-import { langDir } from "@/lib/languages";
+import { splitArticle, splitTermPlural } from "@/lib/grammar";
+import { genderArticles, langDir } from "@/lib/languages";
 import { cardInputSchema, deckInputSchema, LIMITS, zodFieldErrors } from "@/lib/validation";
 import { AudioButton } from "./audio";
 import { ArrowDownIcon, ArrowUpIcon, GripIcon, TrashIcon } from "./icons";
@@ -32,6 +31,9 @@ type Row = {
   imageSource: string | null;
   noImage: boolean;
   groupLabel: string | null;
+  /** Noun grammar ("" = none / not known yet). */
+  article: string;
+  plural: string;
   removeUpload?: boolean;
   pendingUpload?: Blob;
 };
@@ -50,6 +52,8 @@ const emptyRow = (): Row => ({
   imageSource: null,
   noImage: false,
   groupLabel: null,
+  article: "",
+  plural: "",
 });
 
 function fromCard(c: CardDTO): Row {
@@ -66,6 +70,8 @@ function fromCard(c: CardDTO): Row {
     imageSource: c.imageSource,
     noImage: c.noImage,
     groupLabel: c.groupLabel,
+    article: c.article ?? "",
+    plural: c.plural ?? "",
   };
 }
 
@@ -85,25 +91,7 @@ async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
   await Promise.all(workers);
 }
 
-type SentenceRow = {
-  key: string;
-  id?: string;
-  text: string;
-  translation: string;
-  reply: string | null;
-  replyTranslation: string;
-};
-
-const sentenceRow = (s: Partial<SentenceRow> = {}): SentenceRow => ({
-  key: newKey(),
-  text: "",
-  translation: "",
-  reply: null,
-  replyTranslation: "",
-  ...s,
-});
-
-export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?: CardDTO[]; sentences?: SentenceDTO[] }) {
+export function DeckEditor({ deck, cards }: { deck?: DeckDTO; cards?: CardDTO[] }) {
   const router = useRouter();
   const toast = useToast();
   const { gemini } = useApp();
@@ -121,15 +109,6 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
   const [saving, setSaving] = useState<string | null>(null);
   const [picker, setPicker] = useState<{ key: string; query: string } | null>(null);
   const [showImport, setShowImport] = useState(false);
-  const [sentenceRows, setSentenceRows] = useState<SentenceRow[]>(() =>
-    (sentences ?? []).map((x) =>
-      sentenceRow({ id: x.id, text: x.text, translation: x.translation, reply: x.reply, replyTranslation: x.replyTranslation ?? "" }),
-    ),
-  );
-  const updateSentences = (fn: (rows: SentenceRow[]) => SentenceRow[]) => {
-    setSentenceRows(fn);
-    setDirty(true);
-  };
   const [showGenerate, setShowGenerate] = useState(false);
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [autoFilling, setAutoFilling] = useState<Set<string>>(new Set());
@@ -340,27 +319,13 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
             imageAttribution: r.imageAttribution,
             imageSource: r.pendingUpload ? "upload" : r.imageSource,
             noImage: r.noImage,
+            article: r.article || null,
+            plural: r.plural.trim() || null,
             keepUploadedImage: r.removeUpload ? false : undefined,
           })),
         },
       });
       const saved = res.cards; // same order as toSave
-      const sentencesToSave = sentenceRows.filter((x) => x.text.trim());
-      if (sentencesToSave.length || (sentences?.length ?? 0) > 0) {
-        setSaving("Saving sentences…");
-        await api(`/api/decks/${deckId}/sentences`, {
-          method: "PUT",
-          body: {
-            sentences: sentencesToSave.map((x) => ({
-              id: x.id,
-              text: x.text,
-              translation: x.translation,
-              reply: x.reply?.trim() ? x.reply : null,
-              replyTranslation: x.reply?.trim() ? x.replyTranslation : null,
-            })),
-          },
-        });
-      }
       const uploads = toSave
         .map((r, i) => ({ row: r, card: saved[i] }))
         .filter((x) => x.row.pendingUpload && x.card);
@@ -399,6 +364,19 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
         if (organizeFailed) toast.show("AI organising didn't finish — you can retry from the deck page.", { kind: "error" });
       }
 
+      // Articles & plurals: fill in what's missing (Wiktionary for German, the Gemini key for the rest).
+      if (genderArticles(meta.termLang).length && saved.some((c) => !c.grammarChecked)) {
+        setSaving("Checking articles and plurals…");
+        try {
+          for (let i = 0; i < 30; i++) {
+            const g = await api<{ cards: unknown[]; remaining: number }>(`/api/decks/${deckId}/grammar`, { body: {} });
+            if (g.remaining === 0 || g.cards.length === 0) break;
+          }
+        } catch {
+          // Never blocking: the game can look them up later.
+        }
+      }
+
       const missing = saved.filter(
         (c) => !c.imageUrl && !c.hasUploadedImage && !uploadedIds.has(c.id) && !noImageIds.has(c.id),
       );
@@ -427,6 +405,7 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
   }
 
   const dir = langDir(meta.termLang);
+  const articles = genderArticles(meta.termLang);
   const cardCount = rows.filter((r) => !isBlank(r)).length;
 
   return (
@@ -527,20 +506,14 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
 
       {showImport && (
         <BulkImport
-          onAddSentences={(parsed) => {
-            updateSentences((rs) => [
-              ...rs.filter((x) => x.text.trim()),
-              ...parsed.map((p) =>
-                sentenceRow({ text: p.text, translation: p.translation, reply: p.reply, replyTranslation: p.replyTranslation ?? "" }),
-              ),
-            ]);
-            setShowImport(false);
-            toast.show(`Added ${parsed.length} sentences`, { kind: "success" });
-          }}
           onAdd={(parsed) => {
             updateRows((rs) => [
               ...rs.filter((r) => !isBlank(r)),
-              ...parsed.map((p) => ({ ...emptyRow(), term: p.term, definition: p.definition })),
+              // "das Buch, die Bücher - book": the plural goes to its own field.
+              ...parsed.map((p) => {
+                const { term, plural } = splitTermPlural(p.term, meta.termLang);
+                return { ...emptyRow(), term, definition: p.definition, plural: plural ?? "" };
+              }),
             ]);
             setShowImport(false);
             toast.show(`Added ${parsed.length} cards`, { kind: "success" });
@@ -692,6 +665,45 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
                     onPaste={() => pasteUrl(row)}
                     onRemove={() => removeImage(row)}
                   />
+                  {articles.length > 0 && (
+                    <div className="grid grid-cols-[7rem_1fr] gap-3 sm:col-span-2">
+                      <div>
+                        <label htmlFor={`${row.key}-article`} className="label">
+                          Article
+                        </label>
+                        <select
+                          id={`${row.key}-article`}
+                          className="input"
+                          value={row.article}
+                          onChange={(e) => updateRow(row.key, { article: e.target.value })}
+                          data-testid="article-select"
+                        >
+                          <option value="">{splitArticle(row.term, meta.termLang).article ?? "—"}</option>
+                          {articles.map((a) => (
+                            <option key={a} value={a}>
+                              {a}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor={`${row.key}-plural`} className="label">
+                          Plural <span className="font-normal text-muted">(nouns, optional)</span>
+                        </label>
+                        <input
+                          id={`${row.key}-plural`}
+                          className="input"
+                          dir={dir}
+                          lang={meta.termLang}
+                          value={row.plural}
+                          maxLength={60}
+                          placeholder={meta.termLang.startsWith("de") ? "e.g. Bücher" : ""}
+                          onChange={(e) => updateRow(row.key, { plural: e.target.value })}
+                          data-testid="plural-field"
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="sm:col-span-2">
                     <label htmlFor={`${row.key}-example`} className="label">
                       Example <span className="font-normal text-muted">(optional)</span>
@@ -721,16 +733,6 @@ export function DeckEditor({ deck, cards, sentences }: { deck?: DeckDTO; cards?:
           Add card
         </button>
       </section>
-
-      <SentencesEditor
-        rows={sentenceRows}
-        cards={rows.filter((r) => r.term.trim()).map((r) => ({ id: r.key, term: r.term }))}
-        termLang={meta.termLang}
-        definitionLang={meta.definitionLang}
-        deckId={deck?.id}
-        gemini={gemini}
-        onChange={updateSentences}
-      />
 
       <div className="flex justify-end gap-3">
         <Link href={deck ? `/decks/${deck.id}` : "/"} className="btn-ghost">
@@ -847,47 +849,13 @@ function MenuItem({ label, onSelect }: { label: string; onSelect: () => void }) 
   );
 }
 
-function BulkImport({
-  onAdd,
-  onAddSentences,
-}: {
-  onAdd: (rows: { term: string; definition: string }[]) => void;
-  onAddSentences: (rows: ParsedSentence[]) => void;
-}) {
-  const [kind, setKind] = useState<"words" | "sentences">("words");
+function BulkImport({ onAdd }: { onAdd: (rows: { term: string; definition: string }[]) => void }) {
   const [text, setText] = useState("");
   const [delimiter, setDelimiter] = useState<Delimiter>("auto");
   const parsed = useMemo(() => parseImport(text, delimiter), [text, delimiter]);
-  const tabs = (
-    <div className="flex gap-2" role="tablist" aria-label="What to import">
-      {(["words", "sentences"] as const).map((k) => (
-        <button
-          key={k}
-          type="button"
-          role="tab"
-          aria-selected={kind === k}
-          className={kind === k ? "btn-primary min-h-9 px-3 text-sm" : "btn-secondary min-h-9 px-3 text-sm"}
-          onClick={() => setKind(k)}
-          data-testid={`import-tab-${k}`}
-        >
-          {k === "words" ? "Words" : "Sentences"}
-        </button>
-      ))}
-    </div>
-  );
-  if (kind === "sentences") {
-    return (
-      <section className="panel space-y-3 p-5" aria-label="Bulk import">
-        <h2 className="font-semibold">Bulk import</h2>
-        {tabs}
-        <SentenceImport onAdd={onAddSentences} />
-      </section>
-    );
-  }
   return (
     <section className="panel space-y-3 p-5" aria-label="Bulk import">
       <h2 className="font-semibold">Bulk import</h2>
-      {tabs}
       <p className="text-sm text-muted">
         One card per line: <code>term</code> then a tab, a comma, or <code> - </code> then the <code>definition</code>.
       </p>
@@ -1026,184 +994,5 @@ function GeneratePanel({
         {busy ? "Generating…" : "Generate"}
       </button>
     </form>
-  );
-}
-
-function SentenceImport({ onAdd }: { onAdd: (rows: ParsedSentence[]) => void }) {
-  const [text, setText] = useState("");
-  const parsed = useMemo(() => parseSentenceImport(text), [text]);
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted">
-        One sentence per line: <code>sentence | translation</code> (the translation is optional). For a question with its
-        reply use <code>question | translation &gt;&gt; reply | translation</code>.
-      </p>
-      <label htmlFor="sentence-import-text" className="sr-only">
-        Sentences to import
-      </label>
-      <textarea
-        id="sentence-import-text"
-        className="input min-h-36 font-mono text-sm"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={"Mir geht's sehr gut. | I'm very well.\nWie heißt du? | What's your name? >> Ich heiße Anna. | My name is Anna."}
-      />
-      {(parsed.rows.length > 0 || parsed.errors.length > 0) && (
-        <ul className="max-h-60 space-y-1 overflow-auto rounded-xl border border-line p-3 text-sm" data-testid="sentence-import-preview">
-          {parsed.rows.map((r) => (
-            <li key={r.line}>
-              <b>{r.text}</b>
-              {r.translation && <span className="text-muted"> — {r.translation}</span>}
-              {r.reply && (
-                <span>
-                  {" "}
-                  → <b>{r.reply}</b>
-                  {r.replyTranslation && <span className="text-muted"> — {r.replyTranslation}</span>}
-                </span>
-              )}
-            </li>
-          ))}
-          {parsed.errors.map((e) => (
-            <li key={`e${e.line}`} className="text-danger">
-              Line {e.line}: {e.reason}
-            </li>
-          ))}
-        </ul>
-      )}
-      <button type="button" className="btn-primary" disabled={parsed.rows.length === 0} onClick={() => onAdd(parsed.rows)}>
-        Add {parsed.rows.length} sentences
-      </button>
-    </div>
-  );
-}
-
-function SentencesEditor({
-  rows,
-  cards,
-  termLang,
-  definitionLang,
-  deckId,
-  gemini,
-  onChange,
-}: {
-  rows: SentenceRow[];
-  cards: { id: string; term: string }[];
-  termLang: string;
-  definitionLang: string;
-  deckId?: string;
-  gemini: boolean;
-  onChange: (fn: (rows: SentenceRow[]) => SentenceRow[]) => void;
-}) {
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
-  const termOf = new Map(cards.map((c) => [c.id, c.term]));
-  const update = (key: string, patch: Partial<SentenceRow>) => onChange((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
-
-  async function generate() {
-    if (!deckId) return;
-    setBusy(true);
-    try {
-      const res = await api<{ sentences: { text: string; translation: string; reply?: string | null; replyTranslation?: string | null }[] }>(
-        `/api/decks/${deckId}/generate-sentences`,
-        { body: { count: 8 } },
-      );
-      onChange((rs) => [
-        ...rs.filter((x) => x.text.trim()),
-        ...res.sentences.map((g) => sentenceRow({ text: g.text, translation: g.translation, reply: g.reply ?? null, replyTranslation: g.replyTranslation ?? "" })),
-      ]);
-      toast.show(`Added ${res.sentences.length} sentences — review them before saving`, { kind: "success" });
-    } catch (err) {
-      toast.show(err instanceof ApiClientError ? err.message : "Couldn't generate sentences", { kind: "error" });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section aria-labelledby="sentences-h" className="space-y-3" data-testid="sentences-editor">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 id="sentences-h" className="mr-auto text-xl font-semibold">
-          Sentences <span className="text-sm font-semibold text-muted">({rows.filter((r) => r.text.trim()).length}, optional)</span>
-        </h2>
-        {gemini && (
-          <button
-            type="button"
-            className="btn-secondary text-sm"
-            onClick={generate}
-            disabled={busy || !deckId || cards.length === 0}
-            title={!deckId ? "Save the deck first" : undefined}
-            data-testid="generate-sentences"
-          >
-            {busy ? "Generating…" : "Generate sentences"}
-          </button>
-        )}
-      </div>
-      <p className="text-sm text-muted">
-        Sentences using your words. Each one unlocks once you’ve mastered its words, then you practise it in context. Add a
-        reply to turn it into a question-and-answer pair.
-      </p>
-      <ol className="space-y-3">
-        {rows.map((r, i) => {
-          const found = Array.from(
-            new Set([...linkWords(r.text, cards, termLang), ...(r.reply ? linkWords(r.reply, cards, termLang) : [])].map((l) => termOf.get(l.cardId)!)),
-          );
-          return (
-            <li key={r.key} className="panel space-y-2 p-4" data-testid="sentence-row">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-muted">{i + 1}</span>
-                <span className="mr-auto text-xs text-muted" data-testid="sentence-words">
-                  {r.text.trim() ? (found.length ? `Words: ${found.join(", ")}` : "No deck words found in this sentence") : ""}
-                </span>
-                <button
-                  type="button"
-                  className="btn-icon text-base"
-                  aria-label={`Delete sentence ${i + 1}`}
-                  onClick={() => onChange((rs) => rs.filter((x) => x.key !== r.key))}
-                >
-                  <TrashIcon size={18} />
-                </button>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <label htmlFor={`${r.key}-text`} className="label">
-                    Sentence
-                  </label>
-                  <input id={`${r.key}-text`} className="input" lang={termLang} dir={langDir(termLang)} value={r.text} maxLength={300} onChange={(e) => update(r.key, { text: e.target.value })} />
-                </div>
-                <div>
-                  <label htmlFor={`${r.key}-translation`} className="label">
-                    Translation <span className="font-normal text-muted">(optional)</span>
-                  </label>
-                  <input id={`${r.key}-translation`} className="input" lang={definitionLang} dir={langDir(definitionLang)} value={r.translation} maxLength={300} onChange={(e) => update(r.key, { translation: e.target.value })} />
-                </div>
-                {r.reply !== null ? (
-                  <>
-                    <div>
-                      <label htmlFor={`${r.key}-reply`} className="label">
-                        Reply
-                      </label>
-                      <input id={`${r.key}-reply`} className="input" lang={termLang} dir={langDir(termLang)} value={r.reply} maxLength={300} onChange={(e) => update(r.key, { reply: e.target.value })} />
-                    </div>
-                    <div>
-                      <label htmlFor={`${r.key}-reply-translation`} className="label">
-                        Reply translation <span className="font-normal text-muted">(optional)</span>
-                      </label>
-                      <input id={`${r.key}-reply-translation`} className="input" value={r.replyTranslation} maxLength={300} onChange={(e) => update(r.key, { replyTranslation: e.target.value })} />
-                    </div>
-                  </>
-                ) : (
-                  <button type="button" className="text-left text-sm font-semibold text-accent hover:underline" onClick={() => update(r.key, { reply: "" })}>
-                    Add a reply (question &amp; answer)
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-      <button type="button" className="btn-secondary w-full border-dashed" onClick={() => onChange((rs) => [...rs, sentenceRow()])}>
-        Add sentence
-      </button>
-    </section>
   );
 }

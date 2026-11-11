@@ -3,7 +3,6 @@ import { and, asc, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb, schema, type DB } from "./db/client";
 import { ApiError, notFound, UUID_RE } from "./api";
 import { NEW_PROGRESS, MAX_STAGE, type Progress, type StudyCard } from "./learn";
-import { isUnlocked, linkWords, type StudySentence } from "./sentences";
 import { LIMITS, type Settings } from "./validation";
 import type { Card, CardProgress, Deck } from "./db/schema";
 import type { z } from "zod";
@@ -38,6 +37,10 @@ export type CardDTO = {
   noImage: boolean;
   /** Topic group suggested by AI. */
   groupLabel: string | null;
+  /** Definite article (der/die/das, el/la, …) and plural form, for the Articles & plurals game. */
+  article: string | null;
+  plural: string | null;
+  grammarChecked: boolean;
   progress: Progress;
 };
 
@@ -90,6 +93,9 @@ const cardColumns = {
   noImage: schema.cards.noImage,
   imageQuery: schema.cards.imageQuery,
   groupLabel: schema.cards.groupLabel,
+  article: schema.cards.article,
+  plural: schema.cards.plural,
+  grammarChecked: schema.cards.grammarChecked,
   createdAt: schema.cards.createdAt,
   updatedAt: schema.cards.updatedAt,
   hasImageData: sql<boolean>`${schema.cards.imageData} is not null`,
@@ -114,6 +120,9 @@ export function toCardDTO(c: CardRow, p: CardProgress | null | undefined): CardD
     imageSource: c.imageSource,
     noImage: c.noImage,
     groupLabel: c.groupLabel,
+    article: c.article,
+    plural: c.plural,
+    grammarChecked: c.grammarChecked,
     progress: toProgress(p),
   };
 }
@@ -142,6 +151,8 @@ export function toStudyCard(deck: Pick<Deck, "id" | "termLang" | "definitionLang
     imageUrl: c.displayImageUrl,
     imageAttribution: c.imageAttribution,
     group: c.groupLabel,
+    article: c.article,
+    plural: c.plural,
     termLang: deck.termLang,
     definitionLang: deck.definitionLang,
     progress: c.progress,
@@ -242,8 +253,7 @@ export async function getDeckCards(deckId: string, db?: DB): Promise<CardDTO[]> 
 export async function getDeckDetail(userId: string, deckId: string) {
   const deck = await getOwnedDeck(userId, deckId);
   const cards = await getDeckCards(deck.id);
-  const sentences = await getDeckSentences(deck.id, new Map(cards.map((c) => [c.id, c.progress.stage])));
-  return { deck: toDeckDTO(deck), cards, sentences };
+  return { deck: toDeckDTO(deck), cards };
 }
 
 /* --------------------------------- cards -------------------------------- */
@@ -261,7 +271,13 @@ export async function upsertCards(deckId: string, inputs: CardInput[]): Promise<
   const db = await getDb();
   await db.transaction(async (tx) => {
     const existing = await tx
-      .select({ id: schema.cards.id, term: schema.cards.term, definition: schema.cards.definition })
+      .select({
+        id: schema.cards.id,
+        term: schema.cards.term,
+        definition: schema.cards.definition,
+        article: schema.cards.article,
+        plural: schema.cards.plural,
+      })
       .from(schema.cards)
       .where(eq(schema.cards.deckId, deckId));
     const byId = new Map(existing.map((e) => [e.id, e]));
@@ -280,6 +296,8 @@ export async function upsertCards(deckId: string, inputs: CardInput[]): Promise<
       };
       if (c.imageSource !== undefined) base.imageSource = c.imageSource;
       if (c.noImage !== undefined) base.noImage = c.noImage;
+      if (c.article !== undefined) base.article = c.article || null;
+      if (c.plural !== undefined) base.plural = c.plural || null;
       if (c.id && existingIds.has(c.id)) {
         keep.add(c.id);
         const update: Partial<typeof schema.cards.$inferInsert> = { ...base };
@@ -293,6 +311,12 @@ export async function upsertCards(deckId: string, inputs: CardInput[]): Promise<
           update.groupLabel = null;
           update.imageQuery = null;
         }
+        if (before.term !== c.term) {
+          // A different word: look its article/plural up again, unless the user just typed new ones.
+          update.grammarChecked = false;
+          if ((c.article ?? before.article) === before.article) update.article = null;
+          if ((c.plural ?? before.plural) === before.plural) update.plural = null;
+        }
         await tx.update(schema.cards).set(update).where(eq(schema.cards.id, c.id));
       } else {
         await tx.insert(schema.cards).values({ deckId, ...base } as typeof schema.cards.$inferInsert);
@@ -301,171 +325,10 @@ export async function upsertCards(deckId: string, inputs: CardInput[]): Promise<
     const toDelete = [...existingIds].filter((id) => !keep.has(id));
     if (toDelete.length) await tx.delete(schema.cards).where(inArray(schema.cards.id, toDelete));
     await tx.update(schema.decks).set({ updatedAt: new Date() }).where(eq(schema.decks.id, deckId));
-    await relinkSentences(deckId, tx as unknown as DB);
   });
 }
 
-/* ------------------------------- sentences ------------------------------- */
-
-export type SentenceDTO = {
-  id: string;
-  position: number;
-  text: string;
-  translation: string;
-  reply: string | null;
-  replyTranslation: string | null;
-  cardIds: string[];
-  unlocked: boolean;
-  progress: Progress;
-};
-
-type SentenceInput = { id?: string; text: string; translation?: string; reply?: string | null; replyTranslation?: string | null };
-
-/** Recompute which deck words each sentence contains (after cards or sentences change). */
-export async function relinkSentences(deckId: string, db?: DB) {
-  db ??= await getDb();
-  const [deck] = await db.select({ termLang: schema.decks.termLang }).from(schema.decks).where(eq(schema.decks.id, deckId));
-  if (!deck) return;
-  const cards = await db.select({ id: schema.cards.id, term: schema.cards.term }).from(schema.cards).where(eq(schema.cards.deckId, deckId));
-  const rows = await db
-    .select({ id: schema.sentences.id, text: schema.sentences.text, reply: schema.sentences.reply, cardIds: schema.sentences.cardIds })
-    .from(schema.sentences)
-    .where(eq(schema.sentences.deckId, deckId));
-  for (const r of rows) {
-    // For question & answer pairs, the reply's words count too ("Wie geht's dir?" → "Mir geht's gut.").
-    const found = [...linkWords(r.text, cards, deck.termLang), ...(r.reply ? linkWords(r.reply, cards, deck.termLang) : [])];
-    const ids = Array.from(new Set(found.map((l) => l.cardId)));
-    if (ids.join() !== (r.cardIds ?? []).join()) {
-      await db.update(schema.sentences).set({ cardIds: ids }).where(eq(schema.sentences.id, r.id));
-    }
-  }
-}
-
-/** Replace the deck's sentence list in one transaction (create / update / delete / reorder), then relink. */
-export async function upsertSentences(deckId: string, inputs: SentenceInput[]): Promise<void> {
-  if (inputs.length > LIMITS.sentencesPerDeck) {
-    throw new ApiError(400, "limit_reached", `A deck can have at most ${LIMITS.sentencesPerDeck} sentences`);
-  }
-  const db = await getDb();
-  await db.transaction(async (tx) => {
-    const existing = await tx
-      .select({ id: schema.sentences.id, text: schema.sentences.text, reply: schema.sentences.reply })
-      .from(schema.sentences)
-      .where(eq(schema.sentences.deckId, deckId));
-    const byId = new Map(existing.map((e) => [e.id, e]));
-    const keep = new Set<string>();
-    for (let i = 0; i < inputs.length; i++) {
-      const s = inputs[i];
-      const values = {
-        position: i,
-        text: s.text,
-        translation: s.translation ?? "",
-        reply: s.reply || null,
-        replyTranslation: s.reply ? s.replyTranslation || null : null,
-      };
-      if (s.id && byId.has(s.id)) {
-        keep.add(s.id);
-        await tx.update(schema.sentences).set(values).where(eq(schema.sentences.id, s.id));
-        const before = byId.get(s.id)!;
-        // A changed sentence starts its ladder again.
-        if (before.text !== s.text || (before.reply ?? null) !== (values.reply ?? null)) {
-          await tx.delete(schema.sentenceProgress).where(eq(schema.sentenceProgress.sentenceId, s.id));
-        }
-      } else {
-        await tx.insert(schema.sentences).values({ deckId, ...values });
-      }
-    }
-    const toDelete = [...byId.keys()].filter((id) => !keep.has(id));
-    if (toDelete.length) await tx.delete(schema.sentences).where(inArray(schema.sentences.id, toDelete));
-    await relinkSentences(deckId, tx as unknown as DB);
-  });
-}
-
-export async function getDeckSentences(deckId: string, cardStages: Map<string, number>, db?: DB): Promise<SentenceDTO[]> {
-  db ??= await getDb();
-  const rows = await db
-    .select({ s: schema.sentences, p: schema.sentenceProgress })
-    .from(schema.sentences)
-    .leftJoin(schema.sentenceProgress, eq(schema.sentenceProgress.sentenceId, schema.sentences.id))
-    .where(eq(schema.sentences.deckId, deckId))
-    .orderBy(asc(schema.sentences.position));
-  const anyMastered = [...cardStages.values()].some((st) => st >= MAX_STAGE);
-  return rows.map(({ s, p }) => ({
-    id: s.id,
-    position: s.position,
-    text: s.text,
-    translation: s.translation,
-    reply: s.reply,
-    replyTranslation: s.replyTranslation,
-    cardIds: s.cardIds ?? [],
-    unlocked: isUnlocked(s.cardIds ?? [], (id) => cardStages.get(id), anyMastered),
-    progress: toProgress(p as CardProgress | null),
-  }));
-}
-
-export function toStudySentence(deck: Pick<Deck, "id" | "termLang" | "definitionLang">, s: SentenceDTO): StudySentence {
-  return {
-    id: s.id,
-    deckId: deck.id,
-    text: s.text,
-    translation: s.translation,
-    reply: s.reply,
-    replyTranslation: s.replyTranslation,
-    cardIds: s.cardIds,
-    termLang: deck.termLang,
-    definitionLang: deck.definitionLang,
-    unlocked: s.unlocked,
-    progress: s.progress,
-  };
-}
-
-/** For words without their own example: the first imported sentence that contains them. */
-export function examplesFromSentences(sentences: SentenceDTO[]): Map<string, { text: string; translation: string }> {
-  const out = new Map<string, { text: string; translation: string }>();
-  for (const s of sentences) for (const id of s.cardIds) if (!out.has(id)) out.set(id, { text: s.text, translation: s.translation });
-  return out;
-}
-
-export async function saveSentenceProgress(sentenceId: string, p: Progress, db?: DB) {
-  db ??= await getDb();
-  const values = {
-    sentenceId,
-    stage: p.stage,
-    ease: p.ease,
-    intervalDays: p.intervalDays,
-    dueAt: p.dueAt ? new Date(p.dueAt) : new Date(),
-    reps: p.reps,
-    lapses: p.lapses,
-    correctStreak: p.correctStreak,
-    lastReviewedAt: p.lastReviewedAt ? new Date(p.lastReviewedAt) : null,
-    modeStats: p.modeStats,
-    dayKey: p.dayKey ?? null,
-    dayStartStage: p.dayStartStage ?? 0,
-    dayWrong: p.dayWrong ?? 0,
-    dayCorrect: p.dayCorrect ?? 0,
-  };
-  const { sentenceId: _id, ...update } = values;
-  void _id;
-  await db
-    .insert(schema.sentenceProgress)
-    .values(values)
-    .onConflictDoUpdate({ target: schema.sentenceProgress.sentenceId, set: { ...update, updatedAt: new Date() } });
-}
-
-export async function getOwnedSentence(userId: string, sentenceId: string) {
-  if (!UUID_RE.test(sentenceId)) throw notFound("Sentence not found");
-  const db = await getDb();
-  const [row] = await db
-    .select({ sentence: schema.sentences, deck: schema.decks })
-    .from(schema.sentences)
-    .innerJoin(schema.decks, eq(schema.sentences.deckId, schema.decks.id))
-    .where(and(eq(schema.sentences.id, sentenceId), eq(schema.decks.userId, userId)))
-    .limit(1);
-  if (!row) throw notFound("Sentence not found");
-  return row;
-}
-
-export async function appendCards(deckId: string, rows: { term: string; definition: string }[]) {
+export async function appendCards(deckId: string, rows: { term: string; definition: string; plural?: string | null }[]) {
   const db = await getDb();
   const [{ n, maxPos }] = await db
     .select({ n: count(), maxPos: sql<number>`coalesce(max(${schema.cards.position}), -1)` })
@@ -478,9 +341,10 @@ export async function appendCards(deckId: string, rows: { term: string; definiti
   const start = Number(maxPos) + 1;
   await db
     .insert(schema.cards)
-    .values(rows.map((r, i) => ({ deckId, position: start + i, term: r.term, definition: r.definition })));
+    .values(
+      rows.map((r, i) => ({ deckId, position: start + i, term: r.term, definition: r.definition, plural: r.plural ?? null })),
+    );
   await db.update(schema.decks).set({ updatedAt: new Date() }).where(eq(schema.decks.id, deckId));
-  await relinkSentences(deckId, db);
 }
 
 export async function duplicateDeck(userId: string, deckId: string): Promise<Deck> {
@@ -515,22 +379,11 @@ export async function duplicateDeck(userId: string, deckId: string): Promise<Dec
           noImage: c.noImage,
           imageQuery: c.imageQuery,
           groupLabel: c.groupLabel,
+          article: c.article,
+          plural: c.plural,
+          grammarChecked: c.grammarChecked,
         })),
       );
-    }
-    const sents = await tx.select().from(schema.sentences).where(eq(schema.sentences.deckId, deck.id));
-    if (sents.length) {
-      await tx.insert(schema.sentences).values(
-        sents.map((x) => ({
-          deckId: copy.id,
-          position: x.position,
-          text: x.text,
-          translation: x.translation,
-          reply: x.reply,
-          replyTranslation: x.replyTranslation,
-        })),
-      );
-      await relinkSentences(copy.id, tx as unknown as DB);
     }
     return copy;
   });
@@ -540,8 +393,6 @@ export async function resetDeckProgress(deckId: string) {
   const db = await getDb();
   const ids = db.select({ id: schema.cards.id }).from(schema.cards).where(eq(schema.cards.deckId, deckId));
   await db.delete(schema.cardProgress).where(inArray(schema.cardProgress.cardId, ids));
-  const sids = db.select({ id: schema.sentences.id }).from(schema.sentences).where(eq(schema.sentences.deckId, deckId));
-  await db.delete(schema.sentenceProgress).where(inArray(schema.sentenceProgress.sentenceId, sids));
 }
 
 export async function resetCardProgress(cardId: string) {
@@ -577,7 +428,7 @@ export async function saveProgress(cardId: string, p: Progress, db?: DB) {
     .onConflictDoUpdate({ target: schema.cardProgress.cardId, set: { ...update, updatedAt: new Date() } });
 }
 
-/** Number of cards the user started learning today (progress rows created since local midnight). */
+/** Number of cards the user started learning today (progress rows created since local midnight, past "New"). */
 export async function newCardsIntroducedToday(userId: string, since: Date): Promise<number> {
   const db = await getDb();
   const [row] = await db
@@ -585,7 +436,9 @@ export async function newCardsIntroducedToday(userId: string, since: Date): Prom
     .from(schema.cardProgress)
     .innerJoin(schema.cards, eq(schema.cards.id, schema.cardProgress.cardId))
     .innerJoin(schema.decks, eq(schema.decks.id, schema.cards.deckId))
-    .where(and(eq(schema.decks.userId, userId), gte(schema.cardProgress.createdAt, since)));
+    .where(
+      and(eq(schema.decks.userId, userId), gte(schema.cardProgress.createdAt, since), gte(schema.cardProgress.stage, 1)),
+    );
   return Number(row?.n ?? 0);
 }
 
@@ -614,20 +467,7 @@ export async function dueSummary(userId: string, now = new Date()) {
   return { total, perDeck };
 }
 
-/** Distinct local review days (YYYY-MM-DD) for streak computation. */
-export async function reviewDays(userId: string, tzOffsetMinutes: number): Promise<string[]> {
-  const db = await getDb();
-  const since = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
-  const rows = await db
-    .selectDistinct({
-      day: sql<string>`to_char(${schema.reviewLog.createdAt} - make_interval(mins => ${tzOffsetMinutes}), 'YYYY-MM-DD')`,
-    })
-    .from(schema.reviewLog)
-    .where(and(eq(schema.reviewLog.userId, userId), gte(schema.reviewLog.createdAt, since)));
-  return rows.map((r) => r.day);
-}
-
-/** Consecutive days with ≥ 1 review, ending today (or yesterday if nothing yet today). */
+/** Consecutive days in `days`, ending today (or yesterday if today isn't done yet). */
 export function computeStreak(days: string[], today: string): number {
   const set = new Set(days);
   const d = new Date(`${today}T00:00:00Z`);
@@ -699,3 +539,86 @@ export async function cardsWithoutImages(deckId: string) {
     );
 }
 
+
+/* ------------------------------ daily review ------------------------------ */
+
+export type DailyStatus = { day: string; total: number; answered: number; completed: boolean };
+
+/** All of the user's words that are known well enough for the daily review, as study cards. */
+export async function dailyPool(userId: string, minStage: number): Promise<StudyCard[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ card: cardColumns, progress: schema.cardProgress, deck: schema.decks })
+    .from(schema.cards)
+    .innerJoin(schema.decks, eq(schema.decks.id, schema.cards.deckId))
+    .innerJoin(schema.cardProgress, eq(schema.cardProgress.cardId, schema.cards.id))
+    .where(and(eq(schema.decks.userId, userId), gte(schema.cardProgress.stage, minStage)));
+  return rows.map((r) => toStudyCard(r.deck, toCardDTO(r.card as CardRow, r.progress)));
+}
+
+export async function dailyPoolCount(userId: string, minStage: number): Promise<number> {
+  const db = await getDb();
+  const [row] = await db
+    .select({ n: count() })
+    .from(schema.cardProgress)
+    .innerJoin(schema.cards, eq(schema.cards.id, schema.cardProgress.cardId))
+    .innerJoin(schema.decks, eq(schema.decks.id, schema.cards.deckId))
+    .where(and(eq(schema.decks.userId, userId), gte(schema.cardProgress.stage, minStage)));
+  return Number(row?.n ?? 0);
+}
+
+export async function getDailyReview(userId: string, day: string) {
+  const db = await getDb();
+  const [row] = await db
+    .select()
+    .from(schema.dailyReviews)
+    .where(and(eq(schema.dailyReviews.userId, userId), eq(schema.dailyReviews.day, day)))
+    .limit(1);
+  return row ?? null;
+}
+
+/** Today's word list is fixed once picked, so reloading the page continues the same review. */
+export async function createDailyReview(userId: string, day: string, cardIds: string[]) {
+  const db = await getDb();
+  await db.insert(schema.dailyReviews).values({ userId, day, cardIds }).onConflictDoNothing();
+  return (await getDailyReview(userId, day))!;
+}
+
+export function dailyStatus(row: { day: string; cardIds: string[]; answeredIds: string[]; completedAt: Date | null } | null, day: string): DailyStatus {
+  if (!row) return { day, total: 0, answered: 0, completed: false };
+  return { day, total: row.cardIds.length, answered: row.answeredIds.length, completed: Boolean(row.completedAt) };
+}
+
+/** Records the first answer to one of today's words; the review is complete once every word was answered. */
+export async function markDailyAnswered(userId: string, day: string, cardId: string): Promise<DailyStatus> {
+  const db = await getDb();
+  const row = await getDailyReview(userId, day);
+  if (!row || row.completedAt || !row.cardIds.includes(cardId)) return dailyStatus(row, day);
+  const answered = row.answeredIds.includes(cardId) ? row.answeredIds : [...row.answeredIds, cardId];
+  let completedAt: Date | null = null;
+  const left = row.cardIds.filter((id) => !answered.includes(id));
+  if (left.length === 0) completedAt = new Date();
+  else {
+    // Words deleted since this morning can't be answered any more; they don't block the review.
+    const [{ n }] = await db.select({ n: count() }).from(schema.cards).where(inArray(schema.cards.id, left));
+    if (Number(n) === 0) completedAt = new Date();
+  }
+  const [updated] = await db
+    .update(schema.dailyReviews)
+    .set({ answeredIds: answered, ...(completedAt ? { completedAt } : {}) })
+    .where(eq(schema.dailyReviews.id, row.id))
+    .returning();
+  return dailyStatus(updated, day);
+}
+
+/** Local days on which the daily review was finished (for the streak). */
+export async function dailyCompletedDays(userId: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ day: schema.dailyReviews.day })
+    .from(schema.dailyReviews)
+    .where(and(eq(schema.dailyReviews.userId, userId), sql`${schema.dailyReviews.completedAt} is not null`))
+    .orderBy(desc(schema.dailyReviews.day))
+    .limit(400);
+  return rows.map((r) => r.day);
+}

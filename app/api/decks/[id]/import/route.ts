@@ -1,5 +1,6 @@
 import { ok, parseJson, requireUser, route } from "@/lib/api";
 import { appendCards, getOwnedDeck } from "@/lib/data";
+import { splitTermPlural } from "@/lib/grammar";
 import { parseImport } from "@/lib/import-parser";
 import { importSchema } from "@/lib/validation";
 
@@ -13,7 +14,8 @@ export const POST = route(async (req, ctx: RouteContext<"/api/decks/[id]/import"
   const { text, delimiter, commit } = await parseJson(req, importSchema);
   const parsed = parseImport(text, delimiter ?? "auto");
   if (commit) {
-    await appendCards(deck.id, parsed.rows);
+    // "das Buch, die Bücher - book": the plural goes to its own field.
+    await appendCards(deck.id, parsed.rows.map((r) => ({ ...r, ...splitTermPlural(r.term, deck.termLang) })));
     return ok({ ...parsed, added: parsed.rows.length });
   }
   return ok(parsed);

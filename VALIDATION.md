@@ -32,7 +32,7 @@ Command: `npm run lint && npm run typecheck && npm test && npm run test:e2e && n
 - ✅ Login lockout after 10 failures (429), other usernames unaffected.
 - ✅ Ownership isolation: user B gets **404** on all 15 deck/card endpoints for user A's deck and card; A's data unchanged.
 - ✅ Card upsert creates + updates + deletes + reorders in one call; invalid input rolls back; foreign card ids can't be hijacked.
-- ✅ Review endpoint updates `card_progress` (stage, lapses, mode stats) and writes `review_log`; due count and streak update.
+- ✅ Review endpoint updates `card_progress` (stage, lapses, mode stats) and writes `review_log`; due count updates; the streak only counts finished daily reviews.
 - ✅ Account deletion requires the password and cascades (users, decks, cards, progress, review log).
 - Also: session cookie flags and 30-day JWT, logout, password change, settings validation, `ALLOW_SIGNUPS=false`, import preview/commit, CSV export, duplicate, upload magic-byte / size checks, ETag 304, queue building with distractors, reset progress, best Match time, 1,000-card limit, health/config, Openverse → Wikimedia fallback, image lookup never failing, MyMemory vs Gemini translation with fallback, Gemini-only routes 404 without key, TTS WAV + cache, generate-deck JSON validation.
 
@@ -54,7 +54,7 @@ External HTTP APIs are mocked by a local mock server (server-side calls) and `pa
 | 10 | User B opening user A's deck, edit and study URLs → HTTP **404** page; API 404 | ✅ |
 | 11 | Per-user Gemini key: without a key the AI UI is hidden; a wrong key is rejected; a valid key (mocked Google) connects, "Generate deck" and Gemini auto-fill work; removing it turns AI off; another user isn't affected. In-app guide explains when a word is learned (personalised numbers) | ✅ |
 
-| 12 | Native recording plays for “der Hund” (article via device voice, then the Wikimedia recording); sentences fall back to the device voice; English verbs get no picture without AI; with an `AQ.` key, **Organize with AI** sets topics and removes the automatic picture from “to reflect”, and study screens show no empty image box | ✅ |
+| 12 | Native recording plays for “der Hund” (article via device voice, then the Wikimedia recording); phrases fall back to the device voice; English verbs get no picture without AI; with an `AQ.` key, **Organize with AI** sets topics and removes the automatic picture from “to reflect”, and study screens show no empty image box | ✅ |
 
 ### Update checks (better sound, smart pictures, topics, new key format)
 
@@ -74,18 +74,18 @@ Speaking practice was removed at the owner's request (see DECISIONS.md #68–71)
 - Unit tests cover session planning order, daily step limits, the free first view, mistakes not consuming steps, the 3-mistake cap, reviews done after one correct answer, words excluded once their day is done, topics (AI labels, sets of 8, 75% rule, summary), and an "it never becomes endless" regression bound (≤ 60 questions, ≤ 6 per word for 10 new words at 75%).
 - E2E: with default settings, a 4-word deck takes exactly 12 questions (each word: see → multiple choice → listening), ends with "Done for today!", shows the stats, and "Keep going anyway" continues with dictation; the deck page shows the set as "Learning now". The full-ladder test (5 steps/day) still follows one word to Mastered and checks wrong answers return 3–5 questions later.
 
-### Update: sentences
-
-- Unit tests: tokenizing, word linking (German examples: *kommst → kommen*, *heißt → heißen*, *geht's → gehen*, *der Hund*, *guten Morgen*; *sehen* is **not** linked to *sehr*), sentence import (pairs, errors), unlock rules, the sentence ladder (with and without a reply, mistakes, daily limits), planning, and each exercise builder (fill in the blank incl. blanking the reply, word order, Q&A board and single-pair "choose the reply").
-- Integration tests: saving and relinking when words change, unlocking after mastering words, sentences in Learn and Sentences mode, examples on word cards, sentence reviews updating progress, editing restarting the ladder, privacy (404 for other users), duplication, and Gemini sentence generation (mocked).
-- E2E (desktop + mobile, 3 consecutive passing runs): import 2 sentences in the editor → both locked with "needs: sehr, gut" → learn the 3 words to Mastered (the example sentence shows on a card back) → both unlock → Sentences mode runs fill in the blank → sentence → word order (→ Q&A for the pair) → both mastered.
-- Screenshots of every sentence exercise were reviewed at 390 px and 1280 px.
-
 ### Update: redesign
 
 - Full chain passes: lint, typecheck, 155 unit/integration tests, 42 E2E tests (desktop + mobile), build.
 - Lighthouse (mobile, production build) after the redesign: landing 100 / 100 / 100; dashboard 94 / 100 / 100; deck 94 / 100 / 100; flashcards 93 / 100 / 100; Learn 93 / 100 / 96. The one Learn issue is a console 404 for the mock recording URL used in this test setup, which doesn't exist on the real Wikimedia server.
 - Screenshots of every page at 390 px and 1280 px, in light and dark mode, were reviewed and refreshed in `docs/screenshots/`.
+
+### Update: daily review, Articles & plurals, sentences removed
+
+- Full chain passes: lint, typecheck, 155 unit/integration tests, 44 E2E tests (desktop + mobile), build.
+- Unit tests (`grammar-daily.test.ts`): splitting articles (incl. French l’), `das Buch, die Bücher` import lines, strict plural checking (Bucher ≠ Bücher, Strasse ≠ Straße), umlauts, 4 unique plural options, full forms, tips, round building (article + plural, typing once known, non-nouns skipped); daily plan order (due → most missed → longest unseen, known words only, exclusions), daily answers (not-due right answer leaves the schedule alone; wrong drops to Written; due reviewed normally), the 7-day strip.
+- Integration tests (`grammar-daily.test.ts`): the daily review list is fixed and continues after a reload, completes after every word is answered, counts towards the streak (and only it — a Learn answer doesn't); no review without known words; deleted words don't block completion. Grammar lookup from (mocked) German Wiktionary without overwriting typed values, phrases skipped, nothing re-checked, term changes trigger a new lookup; Spanish uses the term's article without a key and Gemini with one; import splits plurals; game answers are stats-only (a New word stays New and Learn's new-words-per-day isn't affected).
+- E2E (desktop + mobile): daily review from the dashboard with a miss coming back once at the end, "1 day streak" and a stamp, "Keep reviewing", dashboard updates. Articles & plurals: lookup from the game's empty state, a round with a wrong article (tip about -ung, full forms, retried at the end, 5/6 score), then a second round where plurals are typed and "Bucher" is wrong; the deck page and editor show the found plural and article.
 
 ## 14.2 Manual checklist
 

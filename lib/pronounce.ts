@@ -10,7 +10,7 @@ export type Recording = { url: string | null; attribution: string | null; prefix
 const NONE: Recording = { url: null, attribution: null, prefix: null };
 const NEGATIVE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
-function wiktionaryApi(lc: string): string {
+export function wiktionaryApi(lc: string): string {
   const override = process.env.WIKTIONARY_API_URL;
   return override ? `${override}/w/api.php` : `https://${lc}.wiktionary.org/w/api.php`;
 }

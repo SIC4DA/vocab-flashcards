@@ -115,10 +115,10 @@ export type Word = { term: string; definition: string };
 export async function createDeckAPI(
   page: Page,
   words: Word[],
-  opts: { title?: string; withImages?: boolean } = {},
+  opts: { title?: string; withImages?: boolean; termLang?: string } = {},
 ): Promise<{ deckId: string; cards: { id: string; term: string; definition: string }[] }> {
   const d = await page.request.post("/api/decks", {
-    data: { title: opts.title ?? "Spanish basics", termLang: "es-ES", definitionLang: "en-US" },
+    data: { title: opts.title ?? "Spanish basics", termLang: opts.termLang ?? "es-ES", definitionLang: "en-US" },
   });
   expect(d.status()).toBe(201);
   const deckId = (await d.json()).deck.id as string;
@@ -151,3 +151,14 @@ export const WORDS: Word[] = [
 
 export const byDefinition = (words: Word[], def: string) => words.find((w) => w.definition === def)!;
 export const byTerm = (words: Word[], term: string) => words.find((w) => w.term === term)!;
+
+/** Move cards up the Learn ladder through the API (seen → 3 right answers → Written, stage 4). */
+export async function makeKnownAPI(page: Page, cardIds: string[]) {
+  for (const cardId of cardIds) {
+    await page.request.post("/api/review", { data: { cardId, mode: "learn", questionType: "flashcard", correct: true } });
+    for (let i = 0; i < 3; i++) {
+      const r = await page.request.post("/api/review", { data: { cardId, mode: "learn", questionType: "mc", correct: true, grade: 4 } });
+      expect(r.status()).toBe(200);
+    }
+  }
+}

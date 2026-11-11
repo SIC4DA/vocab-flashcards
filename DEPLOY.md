@@ -181,7 +181,7 @@ git commit -m "Describe your change"
 git push
 ```
 
-Vercel notices the push and deploys automatically in 1–2 minutes. Database changes (migrations) are applied automatically during the build. Your users, decks, progress and saved Gemini keys are kept: migrations only add new columns and tables.
+Vercel notices the push and deploys automatically in 1–2 minutes. Database changes (migrations) are applied automatically during the build. Your users, decks, progress and saved Gemini keys are kept. Migrations add new columns and tables; the only data a migration has ever removed is the old Sentences feature (`0006`), which was taken out of the app.
 
 ---
 

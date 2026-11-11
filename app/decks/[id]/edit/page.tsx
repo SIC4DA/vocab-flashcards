@@ -6,6 +6,6 @@ export const metadata: Metadata = { title: "Edit deck" };
 
 export default async function EditDeckPage({ params }: PageProps<"/decks/[id]/edit">) {
   const { id } = await params;
-  const { deck, cards, sentences } = await loadDeckForPage(id);
-  return <DeckEditor deck={deck} cards={cards} sentences={sentences} />;
+  const { deck, cards } = await loadDeckForPage(id);
+  return <DeckEditor deck={deck} cards={cards} />;
 }

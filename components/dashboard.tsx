@@ -5,9 +5,16 @@ import { useEffect, useState } from "react";
 import { api, tzOffset } from "@/lib/client/api";
 import type { DeckSummary } from "@/lib/data";
 import { getLanguage } from "@/lib/languages";
+import { WeekStrip, type Week } from "./streak";
 import { EmptyState } from "./ui";
 
-type Due = { total: number; perDeck: Record<string, number>; streak: number };
+type Due = {
+  total: number;
+  perDeck: Record<string, number>;
+  streak: number;
+  week: Week;
+  daily: { total: number; answered: number; completed: boolean; known: number };
+};
 
 export function formatDate(iso: string | null) {
   if (!iso) return "Never";
@@ -26,7 +33,7 @@ export function Dashboard({ initialDecks }: { initialDecks: DeckSummary[] }) {
   useEffect(() => {
     api<Due>(`/api/study/due?tz=${tzOffset()}`)
       .then(setDue)
-      .catch(() => setDue({ total: 0, perDeck: {}, streak: 0 }));
+      .catch(() => setDue({ total: 0, perDeck: {}, streak: 0, week: [], daily: { total: 0, answered: 0, completed: false, known: 0 } }));
   }, []);
 
   const totalDue = due?.total ?? decks.reduce((s, d) => s + d.dueCount, 0);
@@ -44,7 +51,7 @@ export function Dashboard({ initialDecks }: { initialDecks: DeckSummary[] }) {
                 <span className="highlight text-lg" data-testid="due-total">
                   {totalDue} cards
                 </span>{" "}
-                {decksDue > 1 ? `due across ${decksDue} decks.` : "due for review."}
+                {decksDue > 1 ? `due across ${decksDue} decks` : "due"} — they come up in Learn.
               </>
             ) : (
               <>
@@ -56,21 +63,16 @@ export function Dashboard({ initialDecks }: { initialDecks: DeckSummary[] }) {
             )}
           </p>
         </div>
-        <div className="flex items-center gap-6">
-          <div title="Consecutive days with at least one review">
-            <p className="text-sm text-muted">Streak</p>
-            <p className="font-display text-2xl font-semibold tabular-nums" data-testid="streak">
+        <div className="flex flex-col items-start gap-2" title="Days in a row you finished the daily review">
+          <p className="text-sm text-muted">
+            Streak{" "}
+            <span className="font-display text-2xl font-semibold text-fg tabular-nums" data-testid="streak">
               {due?.streak ?? "–"} <span className="font-sans text-sm font-medium text-muted">days</span>
-            </p>
-          </div>
-          {totalDue > 0 ? (
-            <Link href="/review" className="btn-primary px-5">
-              Review all due
-            </Link>
-          ) : (
-            <span className="btn-secondary pointer-events-none px-5 text-muted">All caught up</span>
-          )}
+            </span>
+          </p>
+          {due && due.week.length > 0 && <WeekStrip week={due.week} />}
         </div>
+        {due && <DailyCard daily={due.daily} />}
       </section>
 
       <section aria-labelledby="decks-h" className="space-y-5">
@@ -148,6 +150,40 @@ export function Dashboard({ initialDecks }: { initialDecks: DeckSummary[] }) {
           </ul>
         )}
       </section>
+    </div>
+  );
+}
+
+/** Today's daily review: start / continue it, or see that it's done. */
+function DailyCard({ daily }: { daily: Due["daily"] }) {
+  const left = Math.max(0, daily.total - daily.answered);
+  const minutes = Math.max(1, Math.round((left * 22) / 60));
+  return (
+    <div className="index-card basis-full px-5 pb-4 pt-3" data-testid="daily-card">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0">
+          <h2 className="font-display text-xl font-semibold leading-8">Daily review</h2>
+          <p className="text-[0.95rem] text-muted" data-testid="daily-status">
+            {daily.known === 0
+              ? "Starts once you’ve learned a few words: it brings back what you already know, so it sticks."
+              : daily.completed
+                ? "Done for today. Your streak is safe."
+                : daily.answered > 0
+                  ? `${left} of ${daily.total} words left · about ${minutes} min`
+                  : `${daily.total} words you know, the ones you miss most first · about ${minutes} min`}
+          </p>
+        </div>
+        {daily.known > 0 &&
+          (daily.completed ? (
+            <Link href="/review" className="btn-secondary" data-testid="daily-start">
+              Keep reviewing
+            </Link>
+          ) : (
+            <Link href="/review" className="btn-primary px-5" data-testid="daily-start">
+              {daily.answered > 0 ? "Continue daily review" : "Start daily review"}
+            </Link>
+          ))}
+      </div>
     </div>
   );
 }

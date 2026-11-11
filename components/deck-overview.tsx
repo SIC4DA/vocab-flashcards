@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { api, ApiClientError } from "@/lib/client/api";
-import type { CardDTO, DeckDTO, SentenceDTO } from "@/lib/data";
-import { SENTENCE_MASTERED } from "@/lib/sentences";
-import { getLanguage, langDir } from "@/lib/languages";
+import type { CardDTO, DeckDTO } from "@/lib/data";
+import { cardArticle, hasPlural, splitArticle } from "@/lib/grammar";
+import { genderArticles, getLanguage, langDir } from "@/lib/languages";
 import { deckTopics, NEW_PROGRESS, QUESTION_LABELS, STAGE_NAMES, stageBuckets, topicSummary, type QuestionType, type StudyCard } from "@/lib/learn";
 import { isDue } from "@/lib/srs";
 import { AudioButton } from "./audio";
@@ -22,7 +22,7 @@ export const MODES = [
   { mode: "listen", icon: "🎧", label: "Listen", desc: "Dictation" },
   { mode: "match", icon: "🎯", label: "Match", desc: "Beat the clock" },
   { mode: "test", icon: "📝", label: "Test", desc: "Generated exam" },
-  { mode: "sentences", icon: "💬", label: "Sentences", desc: "Words in context" },
+  { mode: "grammar", icon: "", label: "Articles & plurals", desc: "Gender and plural of each noun" },
 ] as const;
 
 const MODE_STAT_LABELS: Record<string, string> = {
@@ -40,15 +40,7 @@ function formatDue(iso: string | null, stage: number) {
   return d.toLocaleDateString();
 }
 
-export function DeckOverview({
-  deck,
-  cards: initialCards,
-  sentences = [],
-}: {
-  deck: DeckDTO;
-  cards: CardDTO[];
-  sentences?: SentenceDTO[];
-}) {
+export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; cards: CardDTO[] }) {
   const router = useRouter();
   const toast = useToast();
   const confirm = useConfirm();
@@ -61,6 +53,8 @@ export function DeckOverview({
 
   const buckets = useMemo(() => stageBuckets(cards), [cards]);
   const hasTopics = cards.some((c) => c.groupLabel);
+  const genders = genderArticles(deck.termLang);
+  const grammarCount = cards.filter((c) => cardArticle(c, deck.termLang) || hasPlural(c.plural)).length;
   const topics = useMemo(
     () =>
       topicSummary(
@@ -147,7 +141,8 @@ export function DeckOverview({
     toast.show("Card progress reset");
   }
 
-  const otherModes = MODES.filter((m) => m.mode !== "learn");
+  // Articles & plurals only exists for languages whose nouns have a gender.
+  const otherModes = MODES.filter((m) => m.mode !== "learn" && (m.mode !== "grammar" || genders.length > 0));
   const doneToday = cards.length - buckets.new;
 
   return (
@@ -241,8 +236,8 @@ export function DeckOverview({
                   >
                     <span className="font-display text-lg font-semibold group-hover:text-accent">{m.label}</span>
                     <span className="text-right text-sm text-muted">
-                      {m.mode === "sentences" && sentences.length
-                        ? `${sentences.filter((x) => x.unlocked).length}/${sentences.length} unlocked`
+                      {m.mode === "grammar"
+                        ? `${genders.join(", ")} and plurals${grammarCount > 0 ? ` · ${grammarCount} nouns` : ""}`
                         : m.desc}
                     </span>
                   </Link>
@@ -291,8 +286,6 @@ export function DeckOverview({
               ))}
             </ol>
           </section>
-
-          <SentencesPanel deckId={deck.id} sentences={sentences} cards={cards} />
 
           <section className="grid gap-4 md:grid-cols-[2fr_1fr]" aria-label="Progress">
             <div className="panel p-5">
@@ -396,9 +389,17 @@ export function DeckOverview({
                         </td>
                         <td className="headword px-4 py-2 text-base" dir={langDir(deck.termLang)} lang={deck.termLang}>
                           <span className="inline-flex items-center gap-1">
+                            {c.article && !splitArticle(c.term, deck.termLang).article && (
+                              <span className="text-muted">{c.article}</span>
+                            )}
                             {c.term}
                             <AudioButton text={c.term} lang={deck.termLang} size="sm" />
                           </span>
+                          {hasPlural(c.plural) && (
+                            <span className="block font-sans text-xs text-muted" data-testid="card-plural">
+                              pl. {c.plural}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-2" dir={langDir(deck.definitionLang)}>
                           {c.definition}
@@ -437,61 +438,5 @@ export function DeckOverview({
         </>
       )}
     </div>
-  );
-}
-
-function SentencesPanel({ deckId, sentences, cards }: { deckId: string; sentences: SentenceDTO[]; cards: CardDTO[] }) {
-  const termOf = new Map(cards.map((c) => [c.id, c]));
-  const unlocked = sentences.filter((x) => x.unlocked);
-  const mastered = sentences.filter((x) => x.progress.stage >= SENTENCE_MASTERED);
-  const locked = sentences.filter((x) => !x.unlocked);
-  return (
-    <section className="panel p-5" aria-labelledby="sentences-h" data-testid="sentences-panel">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="sentences-h" className="text-xl font-semibold">
-          Sentences
-        </h2>
-        {sentences.length > 0 && (
-          <p className="text-sm text-muted" data-testid="sentences-summary">
-            {unlocked.length} of {sentences.length} unlocked, {mastered.length} mastered
-          </p>
-        )}
-      </div>
-      {sentences.length === 0 ? (
-        <p className="mt-2 text-sm text-muted">
-          Add example sentences in the editor (Bulk import, then Sentences). Each sentence unlocks once you’ve mastered the
-          deck words in it. Then you practise it: fill in the blank, read it, put the words in order, and match questions
-          with replies.{" "}
-          <Link href={`/decks/${deckId}/edit`} className="font-semibold text-accent hover:underline">
-            Add sentences
-          </Link>
-        </p>
-      ) : (
-        <>
-          <p className="mt-1 text-xs text-muted">
-            Unlocked sentences join your daily Learn session. A sentence unlocks when every deck word in it is mastered.
-          </p>
-          {locked.length > 0 && (
-            <ul className="mt-3 divide-y divide-line border-t border-line text-sm" aria-label="Locked sentences">
-              {locked.slice(0, 5).map((x) => {
-                const missing = x.cardIds
-                  .map((id) => termOf.get(id))
-                  .filter((c): c is CardDTO => Boolean(c) && c!.progress.stage < 6)
-                  .map((c) => c.term);
-                return (
-                  <li key={x.id} className="flex flex-wrap items-baseline justify-between gap-x-3 py-2" data-testid="locked-sentence">
-                    <span className="font-display font-medium text-muted">{x.text}</span>
-                    <span className="text-xs text-muted">
-                      {missing.length ? `Locked, needs: ${missing.join(", ")}` : "Locked until your first mastered word"}
-                    </span>
-                  </li>
-                );
-              })}
-              {locked.length > 5 && <li className="text-xs text-muted">…and {locked.length - 5} more</li>}
-            </ul>
-          )}
-        </>
-      )}
-    </section>
   );
 }

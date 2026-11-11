@@ -263,7 +263,6 @@ export function ExampleToggle({ card }: { card: StudyCard }) {
         “{card.example}”
         <AudioButton text={card.example} lang={card.termLang} size="sm" label="Play the example" />
       </p>
-      {card.exampleTranslation && <p className="text-sm text-muted">{card.exampleTranslation}</p>}
     </div>
   ) : (
     <button
