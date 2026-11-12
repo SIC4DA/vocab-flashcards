@@ -4,6 +4,12 @@
  *  1. a native-speaker recording from Wiktionary / Wikimedia Commons (GET /api/pronounce), if enabled and found;
  *  2. Gemini cloud voice (the user's own key) when they prefer it or the device has no voice;
  *  3. the device's speechSynthesis voice (best-quality voice for the language).
+ *
+ * iPhone Safari only lets a page start sound from inside a tap, and a brand-new player has to earn that again.
+ * So sound goes through players that are unlocked once by any tap or key press on the site (installAudioUnlock):
+ * a Web Audio context for recordings (decoded ahead of time, so they start instantly) and one shared <audio>
+ * element for other speeds and the cloud voice. iOS puts them back to sleep in the background; the next tap
+ * wakes them again.
  */
 
 export type SpeakOptions = {
@@ -42,24 +48,164 @@ function getRecording(text: string, lang: string): Promise<Recording> {
   return p;
 }
 
-/** Look up (and preload) the recording for an upcoming word so it plays instantly. */
-export function prefetchPronunciation(text: string, lang: string) {
-  if (typeof window === "undefined" || !text.trim()) return;
-  void getRecording(text, lang).then((r) => {
-    if (r.url) {
-      const a = new Audio();
-      a.preload = "auto";
-      a.crossOrigin = "anonymous";
-      a.src = r.url;
+/* ------------------------------ Unlocking ------------------------------ */
+
+type WebkitWindow = Window & { webkitAudioContext?: typeof AudioContext };
+let ctx: AudioContext | null = null;
+let sharedAudio: HTMLAudioElement | null = null;
+let elementUnlocked = false;
+let speechUnlocked = false;
+let currentSource: AudioBufferSourceNode | null = null;
+/** 0.1 s of silence (8-bit mono WAV): played inside a tap to unlock the shared <audio> element. */
+const SILENT_WAV = "data:audio/wav;base64,UklGRjoDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRYDAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA" + "gICA".repeat(250);
+
+function audioContext(): AudioContext | null {
+  if (ctx) return ctx;
+  if (typeof window === "undefined") return null;
+  const Ctor = window.AudioContext ?? (window as WebkitWindow).webkitAudioContext;
+  if (!Ctor) return null;
+  try {
+    ctx = new Ctor();
+  } catch {
+    return null;
+  }
+  return ctx;
+}
+
+function shared(): HTMLAudioElement {
+  if (!sharedAudio) {
+    sharedAudio = new Audio();
+    // Recordings come from Wikimedia: fetch them anonymously so no third-party cookies are set.
+    sharedAudio.crossOrigin = "anonymous";
+    sharedAudio.preload = "auto";
+  }
+  return sharedAudio;
+}
+
+/** Called inside a tap / key press: wakes every player that isn't allowed to make sound yet. */
+export function unlockAudio() {
+  const c = audioContext();
+  if (c && c.state !== "running") {
+    void c.resume().catch(() => {});
+    try {
+      const src = c.createBufferSource();
+      src.buffer = c.createBuffer(1, 1, 22050);
+      src.connect(c.destination);
+      src.start(0);
+    } catch {
+      // ignore: resume() alone is enough on most browsers
     }
+  }
+  if (!elementUnlocked) {
+    const a = shared();
+    if (!a.src || a.src === SILENT_WAV || a.paused) {
+      a.src = SILENT_WAV;
+      a.play().then(
+        () => {
+          elementUnlocked = true;
+          if (a.src === SILENT_WAV) a.pause();
+        },
+        () => {},
+      );
+    }
+  }
+  if (!speechUnlocked && ttsSupported()) {
+    speechUnlocked = true;
+    const synth = window.speechSynthesis;
+    if (!synth.speaking && !synth.pending) {
+      const u = new SpeechSynthesisUtterance(" ");
+      u.volume = 0;
+      synth.speak(u);
+    }
+  }
+}
+
+const UNLOCK_EVENTS = ["pointerup", "touchend", "click", "keydown"] as const;
+
+/** Any tap or key press anywhere on the site unlocks sound (again, after the page was in the background). */
+export function installAudioUnlock(): () => void {
+  if (typeof window === "undefined") return () => {};
+  const handler = () => {
+    if (elementUnlocked && speechUnlocked && (!ctx || ctx.state === "running")) return;
+    unlockAudio();
+  };
+  for (const e of UNLOCK_EVENTS) window.addEventListener(e, handler, { capture: true, passive: true });
+  return () => {
+    for (const e of UNLOCK_EVENTS) window.removeEventListener(e, handler, { capture: true });
+  };
+}
+
+/* ---------------------------- Preloading ----------------------------- */
+
+const bufferCache = new Map<string, Promise<AudioBuffer | null>>();
+const MAX_BUFFERS = 150;
+
+function loadBuffer(url: string): Promise<AudioBuffer | null> {
+  let p = bufferCache.get(url);
+  if (p) return p;
+  const c = audioContext();
+  if (!c) return Promise.resolve(null);
+  p = fetch(url, { mode: "cors", credentials: "omit" })
+    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+    .then((data) => new Promise<AudioBuffer>((resolve, reject) => c.decodeAudioData(data, resolve, reject)))
+    .catch(() => {
+      bufferCache.delete(url); // allow a retry; the <audio> element is the fallback meanwhile
+      return null;
+    });
+  bufferCache.set(url, p);
+  if (bufferCache.size > MAX_BUFFERS) bufferCache.delete(bufferCache.keys().next().value!);
+  return p;
+}
+
+/** Look up and decode the recording for an upcoming word so it plays instantly. */
+export function prefetchPronunciation(text: string, lang: string): Promise<void> {
+  if (typeof window === "undefined" || !text.trim()) return Promise.resolve();
+  return getRecording(text, lang).then((r) => {
+    if (r.url) return loadBuffer(r.url).then(() => undefined);
   });
 }
 
+/** Prepare a whole set of words (a few at a time, in order). */
+export function prefetchPronunciations(words: { text: string; lang: string }[], parallel = 4) {
+  const queue = words.slice();
+  const next = (): Promise<void> => {
+    const w = queue.shift();
+    return w ? prefetchPronunciation(w.text, w.lang).then(next, next) : Promise.resolve();
+  };
+  for (let i = 0; i < parallel; i++) void next();
+}
+
+/* ------------------------------ Playback ------------------------------ */
+
+/** Recordings play at their natural speed through Web Audio (instant, works without a fresh tap on iPhone). */
+async function playBuffer(url: string): Promise<boolean> {
+  const c = audioContext();
+  if (!c) return false;
+  const buf = await loadBuffer(url);
+  if (!buf) return false;
+  if (c.state !== "running") {
+    await Promise.race([c.resume().catch(() => {}), new Promise((r) => setTimeout(r, 150))]);
+    if ((c.state as AudioContextState) !== "running") return false; // still asleep: no tap since coming back
+  }
+  return new Promise((resolve) => {
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    src.connect(c.destination);
+    currentSource = src;
+    src.onended = () => {
+      if (currentSource === src) currentSource = null;
+      resolve(true);
+    };
+    src.start();
+    window.dispatchEvent(new CustomEvent("vf:recording-played", { detail: url }));
+  });
+}
+
+/** Other speeds (slow replay) and the cloud voice: the shared <audio> element keeps the pitch natural. */
 function playUrl(url: string, rate: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const audio = new Audio();
-    // Recordings come from Wikimedia: fetch them anonymously so no third-party cookies are set.
-    audio.crossOrigin = "anonymous";
+    const audio = shared();
+    audio.pause();
     audio.src = url;
     audio.playbackRate = rate;
     currentAudio = audio;
@@ -67,13 +213,17 @@ function playUrl(url: string, rate: number): Promise<boolean> {
     const done = (ok: boolean) => {
       if (!settled) {
         settled = true;
+        audio.onended = audio.onerror = null;
         resolve(ok);
       }
     };
     audio.onended = () => done(true);
     audio.onerror = () => done(false);
     audio.play().then(
-      () => setTimeout(() => done(true), 6000),
+      () => {
+        elementUnlocked = true;
+        setTimeout(() => done(true), 6000);
+      },
       () => done(false),
     );
   });
@@ -148,10 +298,19 @@ export function onNoVoice(listener: (lang: string) => void) {
 }
 
 export function stopSpeaking() {
-  if (ttsSupported()) window.speechSynthesis.cancel();
+  // Only cancel real speech: on iPhone, speech started right after cancel() is often dropped.
+  if (ttsSupported() && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) window.speechSynthesis.cancel();
   if (currentAudio) {
     currentAudio.pause();
     currentAudio = null;
+  }
+  if (currentSource) {
+    try {
+      currentSource.stop();
+    } catch {
+      // already stopped
+    }
+    currentSource = null;
   }
 }
 
@@ -172,11 +331,7 @@ async function playCloud(text: string, lang: string, rate: number): Promise<bool
       url = URL.createObjectURL(await res.blob());
       cloudCache.set(key, url);
     }
-    const audio = new Audio(url);
-    audio.playbackRate = rate;
-    currentAudio = audio;
-    await audio.play();
-    return true;
+    return await playUrl(url, rate);
   } catch {
     return false;
   }
@@ -185,14 +340,17 @@ async function playCloud(text: string, lang: string, rate: number): Promise<bool
 function speakBrowser(text: string, lang: string, rate: number, voice: SpeechSynthesisVoice | null): Promise<void> {
   return new Promise((resolve) => {
     const synth = window.speechSynthesis;
-    synth.cancel();
+    const busy = synth.speaking || synth.pending;
+    if (busy) synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
     if (voice) u.voice = voice;
     u.rate = rate;
     u.onend = () => resolve();
     u.onerror = () => resolve();
-    synth.speak(u);
+    // iPhone drops an utterance queued right after cancel(): give it a moment first.
+    if (busy) setTimeout(() => synth.speak(u), 80);
+    else synth.speak(u);
     // Some browsers never fire onend; don't hang callers.
     setTimeout(resolve, Math.min(15000, 1500 + text.length * 120));
   });
@@ -218,7 +376,8 @@ export async function speak(text: string, lang: string, opts: SpeakOptions = {})
     if (rec.url) {
       // e.g. "der Hund": the recording says "Hund", so say the article first.
       if (rec.prefix && ttsSupported()) await speakBrowser(rec.prefix, lang, rate, voice);
-      if (await playUrl(rec.url, rate)) return;
+      const natural = Math.abs(rate - 1) <= 0.15;
+      if ((natural && (await playBuffer(rec.url))) || (await playUrl(rec.url, rate))) return;
     }
   }
   if (opts.cloudAvailable && (opts.preferCloud || !voice) && Date.now() > cloudPausedUntil) {

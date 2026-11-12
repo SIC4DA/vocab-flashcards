@@ -29,7 +29,7 @@ export function FlashcardsMode({ cards, title, exitHref }: { cards: StudyCard[];
   const card = deck[index];
   const next = deck[index + 1];
   useEffect(() => {
-    if (next) prefetchPronunciation(next.term, next.termLang);
+    if (next) void prefetchPronunciation(next.term, next.termLang);
   }, [next]);
 
   useEffect(() => {

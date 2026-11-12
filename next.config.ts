@@ -9,7 +9,8 @@ const csp = [
   "img-src 'self' https: data: blob:",
   "media-src 'self' blob: data: https://upload.wikimedia.org",
   "font-src 'self' data:",
-  `connect-src 'self'${isDev ? " ws: wss:" : ""}`,
+  // Recordings are fetched and decoded ahead of time (Web Audio) from Wikimedia.
+  `connect-src 'self' https://upload.wikimedia.org${isDev ? " ws: wss:" : ""}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

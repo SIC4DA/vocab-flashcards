@@ -263,5 +263,9 @@ describe("articles inside Learn", () => {
     expect(checkNounAnswer("der Buch", forms, opts)).toMatchObject({ verdict: "article", correct: false });
     expect(checkNounAnswer("das Buh", forms, opts).verdict).toBe("typo");
     expect(checkNounAnswer("Heft", forms, opts).verdict).toBe("wrong");
+    // Right article, typo in the word: a typo, not an article mistake.
+    const manzana = nounForms({ term: "la manzana" }, "es-ES");
+    expect(checkNounAnswer("la manzena", manzana, { genderArticles: ["el", "la"], lang: "es-ES" }).verdict).toBe("typo");
+    expect(checkNounAnswer("manzana", manzana, { genderArticles: ["el", "la"], lang: "es-ES" }).verdict).toBe("article");
   });
 });

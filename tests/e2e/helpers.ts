@@ -31,6 +31,8 @@ const SPEECH_MOCK = () => {
     pending: false,
     paused: false,
     speak(u: Utt) {
+      // The silent utterance that unlocks speech on iPhone isn't something the user hears.
+      if (!u.text.trim()) return void setTimeout(() => u.onend?.(), 0);
       spoken.push({ text: u.text, lang: u.lang, rate: u.rate });
       setTimeout(() => u.onend?.(), 20);
     },
@@ -49,9 +51,11 @@ const SPEECH_MOCK = () => {
   w.__played = played;
   const origPlay = HTMLMediaElement.prototype.play;
   HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-    played.push(this.src);
+    if (!this.src.startsWith("data:")) played.push(this.src); // data: = the silent unlock clip
     return origPlay.call(this);
   };
+  // Recordings played through Web Audio
+  window.addEventListener("vf:recording-played", (e) => played.push((e as CustomEvent<string>).detail));
 };
 
 type Fixtures = { consoleErrors: string[]; allowConsole: (re: RegExp) => void };

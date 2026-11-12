@@ -23,7 +23,7 @@ import {
   type QuestionType,
   type StudyCard,
 } from "@/lib/learn";
-import { prefetchPronunciation, stopSpeaking } from "@/lib/tts";
+import { prefetchPronunciation, prefetchPronunciations, stopSpeaking } from "@/lib/tts";
 import { useApp, useConfirm } from "../providers";
 import { CloseIcon } from "../icons";
 import { WeekStrip, type Week } from "../streak";
@@ -170,12 +170,27 @@ export function StudySession({
     shownAt.current = performance.now();
   }, [current?.key]);
 
-  // Look up the next word's recording in advance so it plays instantly.
+  // Prepare every word's recording when the session starts (in question order), so each card plays instantly.
+  useEffect(() => {
+    const seen = new Set<string>();
+    const words: { text: string; lang: string }[] = [];
+    for (const q of payload.questions) {
+      const c = payload.cards.find((x) => x.id === q.cardId);
+      if (c && !seen.has(c.id)) {
+        seen.add(c.id);
+        words.push({ text: c.term, lang: c.termLang });
+      }
+    }
+    for (const c of payload.cards) if (!seen.has(c.id)) words.push({ text: c.term, lang: c.termLang });
+    prefetchPronunciations(words);
+  }, [payload]);
+
+  // The current and next word come first.
   const nextQ = queue[pos + 1];
   const nextCard = nextQ ? cards[nextQ.cardId] : undefined;
   useEffect(() => {
-    if (card) prefetchPronunciation(card.term, card.termLang);
-    if (nextCard) prefetchPronunciation(nextCard.term, nextCard.termLang);
+    if (card) void prefetchPronunciation(card.term, card.termLang);
+    if (nextCard) void prefetchPronunciation(nextCard.term, nextCard.termLang);
   }, [card, nextCard]);
 
   const typeFor = useCallback(

@@ -444,7 +444,7 @@ export default async function HelpPage() {
       <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[14rem_1fr]">
         {[
           ["Auto-play term / definition", "Speak the word (or the meaning) automatically when a card appears."],
-          ["Speech rate", "How fast words are spoken (0.5–1.5×)."],
+          ["Speech rate", "How fast the device voice speaks (0.5–1.5×). Native recordings play at their natural speed unless you go well below or above 1×."],
           ["Sound effects", "Short tones for right and wrong answers."],
           ["Theme", "Light, dark, or follow your device."],
         ].map(([t, d]) => (

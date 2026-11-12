@@ -24,7 +24,7 @@ test("each user adds their own Gemini key in Settings; without it the AI UI is h
   await page.getByLabel("Your Gemini API key").fill(VALID_KEY);
   await page.getByTestId("save-gemini-key").click();
   await expect(page.getByTestId("gemini-status")).toHaveText("Connected, key …7890");
-  await expect(page.getByText("Prefer cloud voice")).toBeVisible();
+  await expect(page.getByText("Prefer cloud voice")).toHaveCount(0); // the cloud voice is only a fallback now
   expect((await (await page.request.get("/api/config")).json()).gemini).toBe(true);
 
   // Generate deck works with the user's key

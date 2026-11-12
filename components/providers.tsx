@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/client/api";
 import { DEFAULT_SETTINGS, type Settings } from "@/lib/validation";
-import { onNoVoice } from "@/lib/tts";
+import { installAudioUnlock, onNoVoice } from "@/lib/tts";
 import { languageName } from "@/lib/languages";
 
 /* -------------------------------- Toasts -------------------------------- */
@@ -187,6 +187,8 @@ export function Providers({
   signups: boolean;
 }) {
   const [settings, setSettings] = useState<Settings>(initialSettings);
+  // Any tap anywhere on the site lets sound play (iPhone Safari blocks it otherwise), again after coming back.
+  useEffect(() => installAudioUnlock(), []);
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
   }, [settings.theme]);

@@ -32,9 +32,11 @@ test("pronunciation uses a native-speaker recording when one exists", async ({ p
     .poll(() => page.evaluate(() => (window as unknown as { __tts: { text: string }[] }).__tts.map((t) => t.text)))
     .toContain("Ich habe Hunger");
 
-  // Recordings can be switched off in Settings
+  // Recordings are always used: there's no setting to turn them off.
   await page.goto("/settings");
-  await expect(page.getByLabel("Use native-speaker recordings")).toBeChecked();
+  await expect(page.getByRole("heading", { name: "Audio" })).toBeVisible();
+  await expect(page.getByText("Use native-speaker recordings")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Studying" })).toHaveCount(0);
 });
 
 test("without AI, verbs like 'to spell' get no picture", async ({ page }) => {

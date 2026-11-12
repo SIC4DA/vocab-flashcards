@@ -82,6 +82,7 @@ Speaking practice was removed at the owner's request (see DECISIONS.md #68–71)
 
 ### Update: simpler deck page and settings, sets only, articles inside Learn
 
+- Full chain passes: lint, typecheck, 157 unit/integration tests, 44 E2E tests (desktop + mobile), build.
 - Unit tests: every grammar tip against words that fit and look-alikes that must not get it (German, Spanish, French, Italian, Portuguese; plural tips by gender); noun forms (stored article added, plural with its article, gender colours); writing a noun needs its article (missing or wrong article → "article", typos still "typo"); sets of 8 replace AI topics; stored values of removed settings are ignored.
 - Integration: the settings API accepts only sound/look settings and rejects the fixed ones.
 - E2E: Learn ends with "Nice work!" and never "done for today"; the full ladder is reached through "Keep going" with fixed defaults; the deck page has no Organize button and its ⋯ menu holds Duplicate / Export CSV / Reset progress / Delete deck; Articles & plurals waits until nouns are met in Learn, flashcards show "der" in the masculine colour and "der Hund · die Hunde" on the back, and Write mode marks "Hund" as missing its article.
@@ -133,3 +134,8 @@ Targets: ≥ 85 / ≥ 95 / ≥ 95 — all met. Issues found and fixed during thi
 ## Dependency audit
 
 `npm audit` reports 4 moderate advisories, all in `drizzle-kit`'s bundled `esbuild` dev server (GHSA-67mh-4wv8-2f99). `drizzle-kit` is a dev-only tool used to generate migrations; it isn't part of the deployed app, and the suggested "fix" downgrades drizzle-kit to an incompatible major version, so it was left as is.
+
+## iPhone sound (unlock on tap, set preloading)
+- E2E: recordings play through the new path, the silent unlock clip/utterance is never counted as speech, no audio replays after answering.
+- Not verified on a real iPhone or the iOS Simulator (Xcode is not installed on the build machine): check on device.
+- Full chain passes: lint, typecheck, 157 unit/integration tests, 44 E2E tests (desktop + mobile), build.

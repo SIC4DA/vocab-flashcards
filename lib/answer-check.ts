@@ -127,12 +127,16 @@ export function checkNounAnswer(
   const given = input.trim().replace(/\s+/g, " ");
   const lower = given.toLowerCase();
   let bare = given;
+  let givenArticle: string | null = null;
   for (const art of opts.genderArticles) {
     if (art.endsWith("'") ? lower.startsWith(art) : lower.startsWith(`${art} `)) {
+      givenArticle = art;
       bare = given.slice(art.length).trim();
       break;
     }
   }
+  // The right article: whatever is wrong is in the word itself (a typo stays a typo).
+  if (givenArticle === forms.article) return res;
   const nounOnly = checkAnswer(bare, forms.noun, opts);
   if (nounOnly.correct || nounOnly.verdict === "typo") return { verdict: "article", correct: false, expected: forms.full };
   return res;
