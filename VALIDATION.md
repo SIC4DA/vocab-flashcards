@@ -139,3 +139,7 @@ Targets: ≥ 85 / ≥ 95 / ≥ 95 — all met. Issues found and fixed during thi
 - E2E: recordings play through the new path, the silent unlock clip/utterance is never counted as speech, no audio replays after answering.
 - Not verified on a real iPhone or the iOS Simulator (Xcode is not installed on the build machine): check on device.
 - Full chain passes: lint, typecheck, 157 unit/integration tests, 44 E2E tests (desktop + mobile), build.
+
+## Native article recordings
+- E2E: "der Hund" plays the recording of "der" and then "Hund" (no device voice); "das Buch" with no "das" recording falls back to the device voice for the article, then the recording. Confirmed the back-to-back Web Audio path is what played.
+- Full chain passes: lint, typecheck, 157 unit/integration tests, 44 E2E tests (desktop + mobile), build.

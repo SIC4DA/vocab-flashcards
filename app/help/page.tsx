@@ -353,8 +353,9 @@ export default async function HelpPage() {
             <li>
               <b>A real native speaker.</b> For single words and short expressions the app looks for a recording on Wiktionary /
               Wikimedia Commons (free, no key). Most common words in German, Spanish, French, English and many other
-              languages have one. For nouns like <i>der Hund</i>, the article is read first and then the recording of <i>Hund</i>{" "}
-              plays.
+              languages have one. For nouns like <i>der Hund</i>, a native recording of <i>der</i> plays, then the recording
+              of <i>Hund</i>. Where the article itself has no recording (common in Spanish, Italian and Portuguese), your
+              device&apos;s voice says it.
             </li>
             <li>
               <b>Gemini’s natural voice</b> — only with your own Gemini key, when your device has no voice for the

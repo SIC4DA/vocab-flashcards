@@ -13,16 +13,25 @@ test("pronunciation uses a native-speaker recording when one exists", async ({ p
   await registerAPI(page, uid("Hoerer_"));
   const { deckId } = await germanDeck(page, [
     { term: "der Hund", definition: "dog" },
+    { term: "das Buch", definition: "book" },
     { term: "Ich habe Hunger", definition: "I'm hungry" },
   ]);
   await page.goto(`/decks/${deckId}/study/flashcards`);
+  const played = () => page.evaluate(() => (window as unknown as { __played: string[] }).__played);
+  const tts = () => page.evaluate(() => (window as unknown as { __tts: { text: string; lang: string }[] }).__tts);
   await page.getByRole("button", { name: "Play: der Hund" }).click();
-  // The article comes from the device voice, then the real recording of "Hund" plays.
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __played: string[] }).__played))
-    .toContain("https://upload.wikimedia.org/e2e/De-Hund.ogg.mp3");
-  const tts = await page.evaluate(() => (window as unknown as { __tts: { text: string; lang: string }[] }).__tts);
-  expect(tts).toContainEqual(expect.objectContaining({ text: "der", lang: "de-DE" }));
+  // The article has its own native recording: "der", then "Hund", both real recordings.
+  await expect.poll(played).toContain("https://upload.wikimedia.org/e2e/De-Hund.ogg.mp3");
+  const order = await played();
+  expect(order.indexOf("https://upload.wikimedia.org/e2e/De-der.ogg.mp3")).toBeGreaterThanOrEqual(0);
+  expect(order.indexOf("https://upload.wikimedia.org/e2e/De-der.ogg.mp3")).toBeLessThan(order.indexOf("https://upload.wikimedia.org/e2e/De-Hund.ogg.mp3"));
+  expect((await tts()).map((t) => t.text)).not.toContain("der");
+
+  // No recording of "das" in this mock: the device voice says the article, then the recording of "Buch" plays.
+  await page.keyboard.press("ArrowRight");
+  await page.getByRole("button", { name: "Play: das Buch" }).click();
+  await expect.poll(played).toContain("https://upload.wikimedia.org/e2e/De-Buch.ogg.mp3");
+  expect(await tts()).toContainEqual(expect.objectContaining({ text: "das", lang: "de-DE" }));
 
   // A sentence has no recording → the device voice reads it
   await page.keyboard.press("ArrowRight");

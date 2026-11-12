@@ -47,17 +47,19 @@ const server = http.createServer((req, res) => {
           parse: { wikitext: `{{Deutsch Substantiv Übersicht\n|Genus=${n[0]}\n|Nominativ Plural=${n[1]}\n}}` },
         });
       }
-      // Wiktionary pronunciation lookup: only "Hund" has a recording in this mock.
-      if (url.searchParams.get("generator") === "images" && (url.searchParams.get("titles") ?? "").split("|").includes("Hund")) {
+      // Wiktionary pronunciation lookup: only "Hund", "Buch" and the article "der" have recordings in this mock.
+      const titles = (url.searchParams.get("titles") ?? "").split("|");
+      const word = ["Hund", "Buch", "der"].find((w) => titles.includes(w));
+      if (url.searchParams.get("generator") === "images" && word) {
         return send(res, 200, {
           query: {
             pages: {
               "-1": {
-                title: "Datei:De-Hund.ogg",
+                title: `Datei:De-${word}.ogg`,
                 videoinfo: [
                   {
-                    url: "https://upload.wikimedia.org/e2e/De-Hund.ogg",
-                    derivatives: [{ src: "https://upload.wikimedia.org/e2e/De-Hund.ogg.mp3", type: "audio/mpeg" }],
+                    url: `https://upload.wikimedia.org/e2e/De-${word}.ogg`,
+                    derivatives: [{ src: `https://upload.wikimedia.org/e2e/De-${word}.ogg.mp3`, type: "audio/mpeg" }],
                     extmetadata: { Artist: { value: "E2E Speaker" }, LicenseShortName: { value: "CC BY-SA 4.0" } },
                   },
                 ],

@@ -55,7 +55,7 @@ let ctx: AudioContext | null = null;
 let sharedAudio: HTMLAudioElement | null = null;
 let elementUnlocked = false;
 let speechUnlocked = false;
-let currentSource: AudioBufferSourceNode | null = null;
+let currentSources: AudioBufferSourceNode[] = [];
 /** 0.1 s of silence (8-bit mono WAV): played inside a tap to unlock the shared <audio> element. */
 const SILENT_WAV = "data:audio/wav;base64,UklGRjoDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRYDAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA" + "gICA".repeat(250);
 
@@ -157,11 +157,13 @@ function loadBuffer(url: string): Promise<AudioBuffer | null> {
   return p;
 }
 
-/** Look up and decode the recording for an upcoming word so it plays instantly. */
+/** Look up and decode the recording for an upcoming word (and its article's) so it plays instantly. */
 export function prefetchPronunciation(text: string, lang: string): Promise<void> {
   if (typeof window === "undefined" || !text.trim()) return Promise.resolve();
-  return getRecording(text, lang).then((r) => {
-    if (r.url) return loadBuffer(r.url).then(() => undefined);
+  return getRecording(text, lang).then(async (r) => {
+    if (!r.url) return;
+    const article = r.prefix ? await getRecording(r.prefix, lang) : NO_RECORDING;
+    await Promise.all([loadBuffer(r.url), article.url ? loadBuffer(article.url) : null]);
   });
 }
 
@@ -177,27 +179,58 @@ export function prefetchPronunciations(words: { text: string; lang: string }[], 
 
 /* ------------------------------ Playback ------------------------------ */
 
-/** Recordings play at their natural speed through Web Audio (instant, works without a fresh tap on iPhone). */
-async function playBuffer(url: string): Promise<boolean> {
+/** The part of a recording that isn't silence (recordings often start and end with half a second of it). */
+const trimCache = new WeakMap<AudioBuffer, { offset: number; duration: number }>();
+function voiced(buf: AudioBuffer): { offset: number; duration: number } {
+  let t = trimCache.get(buf);
+  if (!t) {
+    const data = buf.getChannelData(0);
+    let peak = 0;
+    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+    const threshold = peak * 0.05;
+    let first = 0;
+    while (first < data.length && Math.abs(data[first]) < threshold) first++;
+    let last = data.length - 1;
+    while (last > first && Math.abs(data[last]) < threshold) last--;
+    const pad = 0.04;
+    const offset = Math.max(0, first / buf.sampleRate - pad);
+    const end = Math.min(buf.duration, last / buf.sampleRate + pad);
+    t = end > offset ? { offset, duration: end - offset } : { offset: 0, duration: buf.duration };
+    trimCache.set(buf, t);
+  }
+  return t;
+}
+
+/**
+ * Recordings play at their natural speed through Web Audio (instant, works without a fresh tap on iPhone).
+ * Several recordings ("das" + "Buch") play back to back with a short natural pause.
+ */
+async function playBuffers(urls: string[]): Promise<boolean> {
   const c = audioContext();
   if (!c) return false;
-  const buf = await loadBuffer(url);
-  if (!buf) return false;
+  const bufs = await Promise.all(urls.map(loadBuffer));
+  if (bufs.some((b) => !b)) return false;
   if (c.state !== "running") {
     await Promise.race([c.resume().catch(() => {}), new Promise((r) => setTimeout(r, 150))]);
     if ((c.state as AudioContextState) !== "running") return false; // still asleep: no tap since coming back
   }
   return new Promise((resolve) => {
-    const src = c.createBufferSource();
-    src.buffer = buf;
-    src.connect(c.destination);
-    currentSource = src;
-    src.onended = () => {
-      if (currentSource === src) currentSource = null;
+    let at = c.currentTime + 0.02;
+    const sources = bufs.map((buf) => {
+      const { offset, duration } = voiced(buf!);
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.connect(c.destination);
+      src.start(at, offset, duration);
+      at += duration + 0.08;
+      return src;
+    });
+    currentSources = sources;
+    sources[sources.length - 1].onended = () => {
+      if (currentSources === sources) currentSources = [];
       resolve(true);
     };
-    src.start();
-    window.dispatchEvent(new CustomEvent("vf:recording-played", { detail: url }));
+    for (const url of urls) window.dispatchEvent(new CustomEvent("vf:recording-played", { detail: url }));
   });
 }
 
@@ -304,14 +337,14 @@ export function stopSpeaking() {
     currentAudio.pause();
     currentAudio = null;
   }
-  if (currentSource) {
+  for (const src of currentSources) {
     try {
-      currentSource.stop();
+      src.stop();
     } catch {
       // already stopped
     }
-    currentSource = null;
   }
+  currentSources = [];
 }
 
 async function playCloud(text: string, lang: string, rate: number): Promise<boolean> {
@@ -374,10 +407,16 @@ export async function speak(text: string, lang: string, opts: SpeakOptions = {})
   if (opts.recordings !== false) {
     const rec = await getRecording(text, lang);
     if (rec.url) {
-      // e.g. "der Hund": the recording says "Hund", so say the article first.
-      if (rec.prefix && ttsSupported()) await speakBrowser(rec.prefix, lang, rate, voice);
+      // e.g. "das Buch": the recording says "Buch". The article comes from its own native recording
+      // ("das"), played right before; without one, the device voice says it.
+      const article = rec.prefix ? await getRecording(rec.prefix, lang) : NO_RECORDING;
+      const urls = article.url ? [article.url, rec.url] : [rec.url];
       const natural = Math.abs(rate - 1) <= 0.15;
-      if ((natural && (await playBuffer(rec.url))) || (await playUrl(rec.url, rate))) return;
+      if (!article.url && rec.prefix && ttsSupported()) await speakBrowser(rec.prefix, lang, rate, voice);
+      if (natural && (await playBuffers(urls))) return;
+      // Fallback (other speeds, or Web Audio unavailable): the shared <audio> element, one after the other.
+      if (article.url && !(await playUrl(article.url, rate)) && ttsSupported()) await speakBrowser(rec.prefix!, lang, rate, voice);
+      if (await playUrl(rec.url, rate)) return;
     }
   }
   if (opts.cloudAvailable && (opts.preferCloud || !voice) && Date.now() > cloudPausedUntil) {
