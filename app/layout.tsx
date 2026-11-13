@@ -7,6 +7,7 @@ import { ShortcutsOverlay } from "@/components/shortcuts-overlay";
 import { getCurrentUser } from "@/lib/current-user";
 import { signupsAllowed } from "@/lib/env";
 import { DEFAULT_SETTINGS } from "@/lib/validation";
+import { Analytics } from "@vercel/analytics/next";
 
 // Interface text.
 // Only the basic Latin files are loaded (covers German, French, Spanish…); other scripts fall back to Noto.
@@ -63,6 +64,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             {children}
           </main>
           <ShortcutsOverlay />
+          <Analytics />
         </Providers>
       </body>
     </html>

@@ -85,6 +85,8 @@ export const test = base.extend<Fixtures & { allowList: RegExp[] }>({
     await page.route("https://images.e2e.test/**", (route) =>
       route.fulfill({ status: 200, contentType: "image/png", body: THUMB }),
     );
+    // Vercel Analytics only exists on Vercel: serve an empty script locally.
+    await page.route("**/_vercel/**", (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
     // Native-speaker recordings (Wikimedia) are served from a local fixture.
     await page.route("https://upload.wikimedia.org/**", (route) =>
       route.fulfill({ status: 200, contentType: "audio/wav", body: WAV, headers: { "Access-Control-Allow-Origin": "*" } }),

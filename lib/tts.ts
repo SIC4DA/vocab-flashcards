@@ -331,6 +331,7 @@ export function onNoVoice(listener: (lang: string) => void) {
 }
 
 export function stopSpeaking() {
+  speakGeneration++; // a delayed auto-play that hasn't started yet is dropped
   // Only cancel real speech: on iPhone, speech started right after cancel() is often dropped.
   if (ttsSupported() && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) window.speechSynthesis.cancel();
   if (currentAudio) {
@@ -396,11 +397,26 @@ export function canAutoPlay(): boolean {
   return ua ? ua.hasBeenActive : true;
 }
 
+/**
+ * Pause before a word is auto-played when a card appears, so you see the new card before you hear it.
+ * In milliseconds; 0 plays immediately. Pressing a speaker button is never delayed.
+ */
+export const AUTO_PLAY_DELAY_MS = 400;
+
+let speakGeneration = 0;
+
 export async function speak(text: string, lang: string, opts: SpeakOptions = {}): Promise<void> {
   if (!text.trim()) return;
   if (opts.auto && !canAutoPlay()) return;
   const rate = Math.max(0.5, Math.min(1.5, opts.rate ?? 0.9));
   stopSpeaking();
+  if (opts.auto && AUTO_PLAY_DELAY_MS > 0) {
+    const generation = speakGeneration;
+    // The recording is fetched during the pause, so the pause doesn't add to any loading time.
+    if (opts.recordings !== false) void prefetchPronunciation(text, lang);
+    await new Promise((r) => setTimeout(r, AUTO_PLAY_DELAY_MS));
+    if (generation !== speakGeneration) return; // the card changed, or something else started playing
+  }
   const voices = await loadVoices();
   const voice = pickVoice(voices, lang);
 

@@ -143,3 +143,7 @@ Targets: ≥ 85 / ≥ 95 / ≥ 95 — all met. Issues found and fixed during thi
 ## Native article recordings
 - E2E: "der Hund" plays the recording of "der" and then "Hund" (no device voice); "das Buch" with no "das" recording falls back to the device voice for the article, then the recording. Confirmed the back-to-back Web Audio path is what played.
 - Full chain passes: lint, typecheck, 157 unit/integration tests, 44 E2E tests (desktop + mobile), build.
+
+## Auto-play delay
+- `AUTO_PLAY_DELAY_MS = 400`; E2E auto-play checks still pass. E2E now serves an empty Vercel Analytics script (it only exists on Vercel).
+- Full chain passes: lint, typecheck, 157 unit/integration tests, 44 E2E tests (desktop + mobile), build.

@@ -17,6 +17,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.5.12",
     "@neondatabase/serverless": "^1.2.0",
+    "@vercel/analytics": "^2.0.1",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.4",
     "jose": "^6.2.13",
