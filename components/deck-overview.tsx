@@ -314,7 +314,8 @@ export function DeckOverview({ deck, cards: initialCards }: { deck: DeckDTO; car
             <div className="px-5 py-4">
               <h2 className="text-xl font-semibold">Words</h2>
             </div>
-            <div className="overflow-x-auto">
+            {/* relative: keeps the screen-reader-only labels inside the scroll box (they are absolutely positioned) */}
+            <div className="relative overflow-x-auto">
               <table className="w-full min-w-[40rem] text-sm">
                 <thead className="border-y border-line text-left text-sm text-muted">
                   <tr>

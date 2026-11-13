@@ -147,3 +147,8 @@ Targets: ≥ 85 / ≥ 95 / ≥ 95 — all met. Issues found and fixed during thi
 ## Auto-play delay
 - `AUTO_PLAY_DELAY_MS = 400`; E2E auto-play checks still pass. E2E now serves an empty Vercel Analytics script (it only exists on Vercel).
 - Full chain passes: lint, typecheck, 157 unit/integration tests, 44 E2E tests (desktop + mobile), build.
+
+## Phone width
+- Deck page was 641px wide on phones: the screen-reader-only "Actions" header label (absolutely positioned) escaped the table's non-positioned scroll box. The scroll box is now `relative`.
+- New E2E `15-mobile-width`: home, deck, edit, help, settings and review are no wider than 390px (fails at 641px without the fix).
+- Full chain passes: lint, typecheck, 157 unit/integration tests, 46 E2E tests (desktop + mobile), build.
